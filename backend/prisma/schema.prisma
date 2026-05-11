@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  username       String        @unique
+  email          String        @unique
+  fullName       String
+  hashedPassword String
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  logs           ActivityLog[]
+}
+
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  question   String?
+  isAnswered Boolean?
+  hasImage   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}

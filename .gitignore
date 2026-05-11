@@ -1,0 +1,17 @@
+# ── Secrets & Environment ────────────────────────────────────
+.env
+# .env.example
+cek_ai.py
+ 
+# ── RAG Service ──────────────────────────────────────────────
+rag/chroma_db/
+rag/logs/
+rag/uploads/
+rag/__pycache__/
+rag/src/__pycache__/
+rag/**/__pycache__/
+rag/**/*.pyc
+rag/**/*.pyo
+rag/.pytest_cache/
+
+# ── Backend & Frontend ───────────────────────────────────────
