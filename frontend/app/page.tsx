@@ -8,23 +8,15 @@ import {
   Bot,
   Shield,
   Boxes,
-  Zap,
   BarChart3,
   Building2,
   Cpu,
   Code2,
-  Headphones,
-  Printer,
   ChevronRight,
   Eye,
   EyeOff,
   Lock,
   Mail,
-  ArrowRight,
-  Check,
-  MessageSquare,
-  Clock,
-  Users,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,14 +39,14 @@ export default function HomePage() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <main className="min-h-screen bg-white text-black">
+    <main className="min-h-screen bg-[#f5f5f5] text-black">
       {/* NAVBAR */}
       <header className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           {/* LEFT */}
           <div className="flex items-center gap-12">
             <h1 className="text-xl font-bold text-[#0A2A8B]">
-              EPSON
+              WEBSON & CHATSON
             </h1>
 
             <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
@@ -136,7 +128,7 @@ export default function HomePage() {
         <Feature icon={Building2} title="Enterprise" />
       </section>
 
-      {/* FOOTER */}g
+      {/* FOOTER */}
       <footer className="mx-auto max-w-7xl px-6 py-14">
         <div className="grid gap-12 md:grid-cols-4">
           <div>
@@ -262,7 +254,7 @@ export default function HomePage() {
               <div className="relative hidden md:flex flex-col justify-between bg-gradient-to-br from-[#f5f7ff] to-[#eef2ff] p-12">
                 <div>
                   <h1 className="text-4xl font-bold text-[#0a2a8b]">
-                    Chatson
+                    Webson & Chatson
                   </h1>
 
                   <p className="mt-6 max-w-sm text-muted-foreground leading-7">
