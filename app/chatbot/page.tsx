@@ -10,6 +10,9 @@ import {
   X,
   ImageUp,
   Paperclip,
+  Search,
+  MessageSquare,
+  SquarePen,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,11 +25,23 @@ const suggestions = [
   "How do I fix a paper jam issue?",
 ];
 
+const recentChats = [
+  { id: 1, title: "Printer ink replacement guide", time: "Just now" },
+  { id: 2, title: "Wi-Fi connection troubleshoot", time: "2 hours ago" },
+  { id: 3, title: "Blurry print quality fix", time: "Yesterday" },
+  { id: 4, title: "Paper jam on Epson L3210", time: "Yesterday" },
+  { id: 5, title: "How to clean print heads", time: "2 days ago" },
+  { id: 6, title: "Driver installation Windows 11", time: "3 days ago" },
+  { id: 7, title: "Ink cartridge not detected", time: "Last week" },
+];
+
 export default function ChatbotPage() {
   const [message, setMessage] = useState("");
   const [popupOpen, setPopupOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeChat, setActiveChat] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = () => {
@@ -58,11 +73,15 @@ export default function ChatbotPage() {
     setPopupOpen(false);
   };
 
+  const filteredChats = recentChats.filter((c) =>
+    c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <main className="min-h-screen bg-[#f6f6f7] text-black">
+    <div className="flex h-screen flex-col bg-[#f6f6f7] text-black overflow-hidden">
       {/* NAVBAR */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+      <header className="border-b bg-white z-10 flex-shrink-0">
+        <div className="mx-auto flex h-16 max-w-full items-center justify-between px-6">
           {/* LEFT */}
           <div className="flex items-center gap-14">
             <Link href="/">
@@ -94,166 +113,242 @@ export default function ChatbotPage() {
         </div>
       </header>
 
-      {/* CONTENT */}
-      <section className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center px-6">
-        {/* BOT ICON */}
-        <div className="mb-8 flex h-28 w-28 items-center justify-center rounded-full border bg-white shadow-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
-            <Bot size={34} />
-          </div>
-        </div>
+      {/* BODY: sidebar + main */}
+      <div className="flex flex-1 overflow-hidden">
 
-        {/* TITLE */}
-        <h1 className="text-center text-5xl font-bold text-[#0A2A8B]">
-          Hi, I'm Chatson
-        </h1>
-
-        <p className="mt-4 text-center text-lg text-muted-foreground">
-          Anything I can help with today?
-        </p>
-
-        {/* SUGGESTIONS */}
-        <div className="mt-12 grid max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
-          {suggestions.map((item) => (
-            <button
-              key={item}
-              onClick={() => setMessage(item)}
-              className="rounded-full border bg-white px-6 py-4 text-sm shadow-sm transition hover:border-[#0A2A8B] hover:shadow-md"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        {/* INPUT */}
-        <div className="mt-16 w-full max-w-3xl">
-          {/* Attached files bar */}
-          {attachedFiles.length > 0 && (
-            <div className="mb-2 flex items-center gap-2 rounded-2xl border bg-white px-4 py-2 text-sm text-muted-foreground shadow-sm">
-              <Paperclip size={14} />
-              <span>
-                {attachedFiles.length} gambar dilampirkan:{" "}
-                {attachedFiles.map((f) => f.name).join(", ")}
+        {/* SIDEBAR */}
+        <aside className="w-64 flex-shrink-0 bg-white border-r flex flex-col h-full">
+          {/* New Chat button */}
+          <div className="p-3 flex-shrink-0">
+            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#0A2A8B] hover:bg-[#f0f4ff] transition group">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#0A2A8B] text-white group-hover:bg-[#081f66] transition flex-shrink-0">
+                <SquarePen size={14} />
               </span>
+              New Chat
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-3 pb-3 flex-shrink-0">
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[#f6f6f7] px-3 py-2 text-sm">
+              <Search size={14} className="text-gray-400 flex-shrink-0" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search chats..."
+                className="bg-transparent outline-none w-full text-sm text-gray-700 placeholder:text-gray-400"
+              />
             </div>
-          )}
+          </div>
 
-          <div className="flex items-center rounded-full border bg-white px-3 shadow-lg gap-1">
-            {/* PLUS BUTTON with popup */}
-            <div className="relative">
-              <button
-                onClick={() => setPopupOpen((o) => !o)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-[#0A2A8B] hover:text-[#0A2A8B] transition relative flex-shrink-0"
-              >
-                <Plus size={18} />
-                {pendingFiles.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#0A2A8B] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                    {pendingFiles.length}
-                  </span>
-                )}
-              </button>
+          {/* Recents */}
+          <div className="flex-1 overflow-y-auto px-3 pb-4">
+            <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              Recents
+            </p>
 
-              {/* POPUP */}
-              {popupOpen && (
-                <div className="absolute bottom-12 left-0 z-20 w-64 rounded-2xl border bg-white shadow-xl p-4">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Lampirkan Gambar
-                  </p>
-
-                  {/* Drop / click area */}
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleFiles(e.dataTransfer.files);
-                    }}
-                    className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#0A2A8B] hover:bg-blue-50 transition"
+            <div className="flex flex-col gap-0.5">
+              {filteredChats.length > 0 ? (
+                filteredChats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    onClick={() => setActiveChat(chat.id)}
+                    className={`flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition w-full group ${
+                      activeChat === chat.id
+                        ? "bg-[#e8edf8] text-[#0A2A8B]"
+                        : "hover:bg-[#f6f6f7] text-gray-700"
+                    }`}
                   >
-                    <ImageUp size={28} className="text-[#0A2A8B]" />
-                    <span className="text-sm font-medium text-center">
-                      Klik atau seret gambar
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      PNG, JPG, GIF, WEBP
-                    </span>
-                  </div>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => handleFiles(e.target.files)}
-                  />
-
-                  {/* Preview list */}
-                  {pendingFiles.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {pendingFiles.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5"
-                        >
-                          <img
-                            src={URL.createObjectURL(f)}
-                            alt={f.name}
-                            className="w-8 h-8 rounded object-cover flex-shrink-0"
-                          />
-                          <span className="text-xs flex-1 truncate text-gray-700">
-                            {f.name}
-                          </span>
-                          <button
-                            onClick={() => removeFile(i)}
-                            className="text-gray-400 hover:text-red-500 transition flex-shrink-0"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
+                    <MessageSquare
+                      size={14}
+                      className={`mt-0.5 flex-shrink-0 ${
+                        activeChat === chat.id
+                          ? "text-[#0A2A8B]"
+                          : "text-gray-400 group-hover:text-gray-500"
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm leading-snug">
+                        {chat.title}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {chat.time}
+                      </p>
                     </div>
-                  )}
-
-                  {/* Footer */}
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      onClick={attachImages}
-                      className="bg-[#0A2A8B] hover:bg-[#081f66] text-white text-sm px-4 py-1.5 rounded-lg transition"
-                    >
-                      Lampirkan
-                    </button>
-                  </div>
-                </div>
+                  </button>
+                ))
+              ) : (
+                <p className="px-2 py-4 text-xs text-gray-400 text-center">
+                  No chats found
+                </p>
               )}
             </div>
-
-            <Input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleSubmit();
-                }
-              }}
-              placeholder="Ask Chatson anything..."
-              className="border-0 bg-transparent shadow-none focus-visible:ring-0 h-14"
-            />
-
-            <button
-              onClick={handleSubmit}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0A2A8B] text-white transition hover:bg-[#081f66]"
-            >
-              <SendHorizonal size={18} />
-            </button>
           </div>
+        </aside>
 
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Chatson AI can make mistakes. Consider verifying
-            important information.
-          </p>
-        </div>
-      </section>
-    </main>
+        {/* MAIN CONTENT */}
+        <main className="flex-1 overflow-y-auto">
+          <section className="flex min-h-full flex-col items-center justify-center px-6 py-12">
+            {/* BOT ICON */}
+            <div className="mb-8 flex h-28 w-28 items-center justify-center rounded-full border bg-white shadow-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                <Bot size={34} />
+              </div>
+            </div>
+
+            {/* TITLE */}
+            <h1 className="text-center text-5xl font-bold text-[#0A2A8B]">
+              Hi, I'm Chatson
+            </h1>
+
+            <p className="mt-4 text-center text-lg text-muted-foreground">
+              Anything I can help with today?
+            </p>
+
+            {/* SUGGESTIONS */}
+            <div className="mt-12 grid max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
+              {suggestions.map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setMessage(item)}
+                  className="rounded-full border bg-white px-6 py-4 text-sm shadow-sm transition hover:border-[#0A2A8B] hover:shadow-md"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            {/* INPUT */}
+            <div className="mt-16 w-full max-w-3xl">
+              {/* Attached files bar */}
+              {attachedFiles.length > 0 && (
+                <div className="mb-2 flex items-center gap-2 rounded-2xl border bg-white px-4 py-2 text-sm text-muted-foreground shadow-sm">
+                  <Paperclip size={14} />
+                  <span>
+                    {attachedFiles.length} gambar dilampirkan:{" "}
+                    {attachedFiles.map((f) => f.name).join(", ")}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center rounded-full border bg-white px-3 shadow-lg gap-1">
+                {/* PLUS BUTTON with popup */}
+                <div className="relative">
+                  <button
+                    onClick={() => setPopupOpen((o) => !o)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-[#0A2A8B] hover:text-[#0A2A8B] transition relative flex-shrink-0"
+                  >
+                    <Plus size={18} />
+                    {pendingFiles.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-[#0A2A8B] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                        {pendingFiles.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* POPUP */}
+                  {popupOpen && (
+                    <div className="absolute bottom-12 left-0 z-20 w-64 rounded-2xl border bg-white shadow-xl p-4">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Lampirkan Gambar
+                      </p>
+
+                      {/* Drop / click area */}
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleFiles(e.dataTransfer.files);
+                        }}
+                        className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#0A2A8B] hover:bg-blue-50 transition"
+                      >
+                        <ImageUp size={28} className="text-[#0A2A8B]" />
+                        <span className="text-sm font-medium text-center">
+                          Klik atau seret gambar
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          PNG, JPG, GIF, WEBP
+                        </span>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFiles(e.target.files)}
+                      />
+
+                      {/* Preview list */}
+                      {pendingFiles.length > 0 && (
+                        <div className="mt-3 flex flex-col gap-2">
+                          {pendingFiles.map((f, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5"
+                            >
+                              <img
+                                src={URL.createObjectURL(f)}
+                                alt={f.name}
+                                className="w-8 h-8 rounded object-cover flex-shrink-0"
+                              />
+                              <span className="text-xs flex-1 truncate text-gray-700">
+                                {f.name}
+                              </span>
+                              <button
+                                onClick={() => removeFile(i)}
+                                className="text-gray-400 hover:text-red-500 transition flex-shrink-0"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Footer */}
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          onClick={attachImages}
+                          className="bg-[#0A2A8B] hover:bg-[#081f66] text-white text-sm px-4 py-1.5 rounded-lg transition"
+                        >
+                          Lampirkan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Input
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSubmit();
+                    }
+                  }}
+                  placeholder="Ask Chatson anything..."
+                  className="border-0 bg-transparent shadow-none focus-visible:ring-0 h-14"
+                />
+
+                <button
+                  onClick={handleSubmit}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0A2A8B] text-white transition hover:bg-[#081f66]"
+                >
+                  <SendHorizonal size={18} />
+                </button>
+              </div>
+
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Chatson AI can make mistakes. Consider verifying
+                important information.
+              </p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
   );
 }
