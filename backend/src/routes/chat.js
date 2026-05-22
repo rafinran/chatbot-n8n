@@ -62,6 +62,20 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
+function stripMarkdown(s = "") {
+  return String(s)
+    .replace(/```[\s\S]*?```/g, "")      // hapus code block
+    .replace(/\*\*(.*?)\*\*/g, "$1")     // **bold**
+    .replace(/__(.*?)__/g, "$1")         // __bold__
+    .replace(/\*(.*?)\*/g, "$1")         // *italic*
+    .replace(/_(.*?)_/g, "$1")           // _italic_
+    .replace(/\`([^\`]+)`/g, "$1")       // inline code
+    .replace(/^\s*#+\s+/gm, "")          // heading
+    .replace(/^\s*>\s?/gm, "")           // quote
+    .replace(/^\s*[-*]\s+/gm, "• ")      // bullet
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 // POST /api/chat/upload — kirim gambar untuk analisis Gemini Vision
 router.post("/upload", requireAuth, upload.single("image"), async (req, res) => {
@@ -84,6 +98,7 @@ router.post("/upload", requireAuth, upload.single("image"), async (req, res) => 
     ]);
 
     const geminiResponse = result.response.text();
+    const cleaned = stripMarkdown(geminiResponse);
 
     // Kirim Hasil Analisis ke n8n (Webhook Kedua)
     let n8nStatus = "not_sent";
@@ -121,7 +136,7 @@ router.post("/upload", requireAuth, upload.single("image"), async (req, res) => 
 
     // Kirim Response ke Frontend
     res.json({ 
-      response: geminiResponse,
+      response: cleaned,
       status: n8nStatus 
     });
 
