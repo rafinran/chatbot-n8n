@@ -39,7 +39,7 @@ export default function ChatbotPage() {
           <div className="flex items-center gap-14">
             <Link href="/">
               <h1 className="text-2xl font-bold text-[#0A2A8B] cursor-pointer">
-                Chatson
+                Webson & Chatson
               </h1>
             </Link>
 

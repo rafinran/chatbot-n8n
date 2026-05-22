@@ -45,7 +45,7 @@ export default function HomePage() {
           {/* LEFT */}
           <div className="flex items-center gap-12">
             <h1 className="text-xl font-bold text-[#0A2A8B]">
-              EPSON
+              WEBSON & CHATSON
             </h1>
 
             <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
@@ -253,7 +253,7 @@ export default function HomePage() {
               <div className="relative hidden md:flex flex-col justify-between bg-gradient-to-br from-[#f5f7ff] to-[#eef2ff] p-12">
                 <div>
                   <h1 className="text-4xl font-bold text-[#0a2a8b]">
-                    Chatson
+                    Webson & Chatson
                   </h1>
 
                   <p className="mt-6 max-w-sm text-muted-foreground leading-7">
