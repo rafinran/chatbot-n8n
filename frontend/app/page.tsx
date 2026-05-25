@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 
 import {
@@ -33,10 +34,16 @@ import {
 
 export default function HomePage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
+  const isLoggedIn = !loading && user !== null;
 
-  const [open, setOpen] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const handleBotClick = () => {
+    if (isLoggedIn) {
+      router.push("/chatbot");
+    } else {
+      router.push("/login");
+    }
+  }; 
 
   return (
     <main className="min-h-screen bg-[#f5f5f5] text-black">
@@ -45,9 +52,11 @@ export default function HomePage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           {/* LEFT */}
           <div className="flex items-center gap-12">
-            <h1 className="text-xl font-bold text-[#0A2A8B]">
-              WEBSON & CHATSON
-            </h1>
+            <a href="/">
+              <h1 className="text-xl font-bold text-[#0A2A8B] cursor-pointer">
+                WEBSON & CHATSON
+              </h1>
+            </a>
 
             <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
               <a href="#">Solutions</a>
@@ -65,13 +74,26 @@ export default function HomePage() {
             <a href="#">About Webson</a>
             <a href="#">Accessibility</a>
 
-            <Button
-              variant="outline"
-              className="rounded-full px-5"
-              onClick={() => setOpen(true)}
-            >
-              Login
-            </Button>
+            {/* Tombol Login hilang kalau sudah login */}
+            {isLoggedIn === false && (
+              <Button
+                variant="outline"
+                className="rounded-full px-5"
+                onClick={() => router.push("/login")}
+              >
+                Login
+              </Button>
+            )}
+
+            {/* Kalau sudah login, tampilkan tombol ke dashboard */}
+            {isLoggedIn === true && (
+              <Button
+                className="rounded-full bg-[#0A2A8B] px-5 hover:bg-[#081f66]"
+                onClick={() => router.push("/chat")}
+              >
+                Dashboard
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -227,179 +249,11 @@ export default function HomePage() {
 
       {/* FLOATING CHATBOT BUTTON */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleBotClick}
         className="fixed bottom-8 right-8 flex h-20 w-20 items-center justify-center rounded-full bg-[#0A2A8B] text-white shadow-2xl transition hover:scale-105 hover:bg-[#081f66]"
       >
         <Bot size={42} />
       </button>
-
-      {/* LOGIN / REGISTER MODAL */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-full min-w-[1000px] max-w-5xl overflow-hidden border-0 bg-transparent p-0 shadow-none">
-          <div className="sr-only">
-            <DialogTitle>
-              {isRegister
-                ? "Create your account"
-                : "Sign in to your account"}
-            </DialogTitle>
-
-            <DialogDescription>
-              Access your AI operations dashboard.
-            </DialogDescription>
-          </div>
-
-          <Card className="overflow-hidden rounded-3xl border bg-white shadow-2xl">
-            <div className="grid min-h-[700px] md:grid-cols-2">
-              {/* LEFT SIDE */}
-              <div className="relative hidden md:flex flex-col justify-between bg-gradient-to-br from-[#f5f7ff] to-[#eef2ff] p-12">
-                <div>
-                  <h1 className="text-4xl font-bold text-[#0a2a8b]">
-                    Webson & Chatson
-                  </h1>
-
-                  <p className="mt-6 max-w-sm text-muted-foreground leading-7">
-                    Welcome back to the future of enterprise
-                    intelligence. Secure, precise, and entirely
-                    at your command.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-center">
-                  <div className="flex h-72 w-72 items-center justify-center rounded-full bg-gradient-to-br from-[#dfe7ff] to-[#b9c9ff] shadow-inner">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-[#0a2a8b] text-white shadow-lg">
-                      <Bot size={42} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT SIDE */}
-              <div className="min-w-0 p-8 md:p-12">
-                <div className="mt-2">
-                  <h2 className="text-3xl font-bold">
-                    {isRegister
-                      ? "Create your account"
-                      : "Sign in to your account"}
-                  </h2>
-
-                  <p className="mt-2 text-muted-foreground">
-                    Access your AI operations dashboard.
-                  </p>
-                </div>
-
-                <form className="mt-8 space-y-6">
-                  {/* EMAIL */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Email Address
-                    </label>
-
-                    <div className="relative">
-                      <Mail
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        size={18}
-                      />
-
-                      <Input
-                        type="email"
-                        placeholder="operator@enterprise.com"
-                        className="w-full h-12 rounded-xl pl-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* PASSWORD */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Password
-                    </label>
-
-                    <div className="relative">
-                      <Lock
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        size={18}
-                      />
-
-                      <Input
-                        type={
-                          showPassword ? "text" : "password"
-                        }
-                        placeholder="••••••••"
-                        className="w-full h-12 rounded-xl pl-10 pr-10"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowPassword(!showPassword)
-                        }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      >
-                        {showPassword ? (
-                          <Eye size={18} />
-                        ) : (
-                          <EyeOff size={18} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* REMEMBER */}
-                  {!isRegister && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="remember" />
-
-                        <label
-                          htmlFor="remember"
-                          className="text-sm text-muted-foreground"
-                        >
-                          Remember me
-                        </label>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-[#0a2a8b] hover:underline"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
-
-                  {/* MAIN BUTTON */}
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      router.push("/chatbot");
-                    }}
-                    className="h-12 w-full rounded-xl bg-[#0a2a8b] hover:bg-[#09206b]"
-                  >
-                    {isRegister
-                      ? "Create Account →"
-                      : "Login →"}
-                  </Button>
-
-                  {/* SWITCH BUTTON */}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                      setIsRegister(!isRegister)
-                    }
-                    className="h-12 w-full rounded-xl"
-                  >
-                    {isRegister
-                      ? "Login →"
-                      : "Register →"}
-                  </Button>
-                </form>
-              </div>
-            </div>
-          </Card>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }
