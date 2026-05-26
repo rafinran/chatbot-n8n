@@ -89,7 +89,7 @@ export default function HomePage() {
             {isLoggedIn === true && (
               <Button
                 className="rounded-full bg-[#0A2A8B] px-5 hover:bg-[#081f66]"
-                onClick={() => router.push("/chat")}
+                onClick={() => router.push("/")}
               >
                 Dashboard
               </Button>
