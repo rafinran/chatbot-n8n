@@ -1,5 +1,6 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -166,7 +167,7 @@ export default function ChatbotPage() {
       <header className="border-b bg-white z-10 flex-shrink-0">
         <div className="mx-auto flex h-16 max-w-full items-center justify-between px-6">
           <div className="flex items-center gap-14">
-            <Link href="/chatbot">
+            <Link href="/">
               <h1 className="text-2xl font-bold text-[#0A2A8B] cursor-pointer">
                 Webson & Chatson
               </h1>
@@ -297,30 +298,36 @@ export default function ChatbotPage() {
               </section>
             ) : (
               <section className="px-6 py-8">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-3xl mx-auto space-y-6">
                   {messages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`mb-4 flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-xs rounded-lg px-4 py-2 ${
-                          msg.role === "user"
-                            ? "bg-[#0A2A8B] text-white"
-                            : "bg-white border shadow-sm"
-                        }`}
-                      >
-                        <p className="text-sm">{msg.content}</p>
-                      </div>
+                    <div key={idx}>
+                      {msg.role === "user" ? (
+                        /* USER BUBBLE — 75% width, right-aligned */
+                        <div className="flex justify-end">
+                          <div className="max-w-[75%] rounded-2xl bg-[#0A2A8B] px-5 py-3 text-white">
+                            <p className="text-sm leading-relaxed">{msg.content}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ASSISTANT — markdown rendered, Claude-style */
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                            <Bot size={14} />
+                          </div>
+                          <div className="flex-1 text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
+
                   {sending && (
-                    <div className="flex justify-start mb-4">
-                      <div className="bg-white border shadow-sm rounded-lg px-4 py-2">
-                        <p className="text-sm text-gray-500">Thinking...</p>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                        <Bot size={14} />
                       </div>
+                      <p className="text-sm text-gray-400 italic">Thinking...</p>
                     </div>
                   )}
                 </div>
