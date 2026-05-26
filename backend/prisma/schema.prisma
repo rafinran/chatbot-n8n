@@ -28,3 +28,11 @@ model ActivityLog {
   hasImage   Boolean  @default(false)
   createdAt  DateTime @default(now())
 }
+
+model n8n_chat_histories {
+  id         Int    @id @default(autoincrement())
+  session_id String @db.VarChar(255)
+  message    Json
+
+  @@map("n8n_chat_histories")
+}

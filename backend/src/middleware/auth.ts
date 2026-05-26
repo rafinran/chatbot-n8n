@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../db.js";
+import prisma from "../db.ts";
 
 interface AuthPayload {
   userId: number;

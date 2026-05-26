@@ -2,8 +2,8 @@ import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import authRouter from "./routes/auth.js";
-import chatRouter from "./routes/chat.js";
+import authRouter from "./routes/auth.ts";
+import chatRouter from "./routes/chat.ts";
 
 dotenv.config();
 

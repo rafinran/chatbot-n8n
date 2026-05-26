@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import prisma from "../db.js";
-import { requireAuth } from "../middleware/auth.js";
+import prisma from "../db.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 const router = Router();
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
@@ -89,24 +89,26 @@ router.post("/upload", requireAuth, upload.single("image"), async (req: Request,
     const geminiResponse = result.response.text();
 
     // Kirim Hasil Analisis ke n8n (Webhook Kedua)
+    const tanya = message + geminiResponse;
     let n8nStatus = "not_sent";
-    if (process.env.N8N_WEBHOOK_URL_IMAGE) {
+    if (process.env.N8N_WEBHOOK_URL) {
       try {
-        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL_IMAGE, {
+        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            event: "image_analysis",
+            // event: "image_analysis",
+            question: tanya,
             user_id: String(req.user.id),
             user_email: req.user.email,
-            analysis_result: geminiResponse,
-            original_message: message,
-            timestamp: new Date().toISOString(),
+            // analysis_result: geminiResponse,
+            // original_message: message,
+            // timestamp: new Date().toISOString(),
           }),
         });
         if (n8nRes.ok) n8nStatus = "sent_to_n8n";
       } catch (webhookErr: any) {
-        console.error("Gagal mengirim ke n8n vision webhook:", webhookErr.message);
+        console.error("Gagal mengirim ke n8n webhook:", webhookErr.message);
       }
     }
 

@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import prisma from "../db.js";
-import { requireAuth } from "../middleware/auth.js";
+import prisma from "../db.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 const router = Router();
 const COOKIE_MAX_AGE = 8 * 60 * 60 * 1000; // 8 jam
