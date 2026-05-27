@@ -26,6 +26,7 @@ model ActivityLog {
   question   String?
   isAnswered Boolean?
   hasImage   Boolean  @default(false)
+  imagePath  String?
   createdAt  DateTime @default(now())
 }
 

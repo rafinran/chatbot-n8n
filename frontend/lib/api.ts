@@ -52,11 +52,32 @@ export async function getCurrentUser() {
 }
 
 // Chat endpoints
-export async function sendMessage(message: string) {
-  return apiCall("/chat", {
+// export async function sendMessage(message: string) {
+//   return apiCall("/chat", {
+//     method: "POST",
+//     body: JSON.stringify({ message }),
+//   });
+// }
+
+export async function sendMessage(payload: string | FormData) {
+  const isFormData = payload instanceof FormData;
+
+  const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
-    body: JSON.stringify({ message }),
+    // kalau FormData, JANGAN set Content-Type — browser otomatis set boundary-nya
+    headers: isFormData 
+      ? { credentials: "include" } as any
+      : { "Content-Type": "application/json" },
+    credentials: "include",
+    body: isFormData ? payload : JSON.stringify({ message: payload }),
   });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `API error: ${response.status}`);
+  }
+
+  return response.json();
 }
 
 export async function getChatHistory() {
@@ -67,19 +88,19 @@ export async function clearChatHistory() {
   return apiCall("/chat/history", { method: "DELETE" });
 }
 
-export async function uploadImage(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
+// export async function uploadImage(file: File) {
+//   const formData = new FormData();
+//   formData.append("file", file);
 
-  return fetch(`${API_BASE_URL}/chat/upload`, {
-    method: "POST",
-    body: formData,
-    credentials: "include",
-  }).then(async (res) => {
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.error || `Upload failed: ${res.status}`);
-    }
-    return res.json();
-  });
-}
+//   return fetch(`${API_BASE_URL}/chat/upload`, {
+//     method: "POST",
+//     body: formData,
+//     credentials: "include",
+//   }).then(async (res) => {
+//     if (!res.ok) {
+//       const error = await res.json().catch(() => ({}));
+//       throw new Error(error.error || `Upload failed: ${res.status}`);
+//     }
+//     return res.json();
+//   });
+// }
