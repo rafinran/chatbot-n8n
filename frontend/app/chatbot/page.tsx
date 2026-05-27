@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
 }
 
 const suggestions = [
@@ -93,18 +94,30 @@ export default function ChatbotPage() {
     if (!message.trim() || sending) return;
 
     const userMessage = message;
+    const imageFile = attachedFiles[0] ?? null;
+    const imagePreviewUrl = imageFile ? URL.createObjectURL(imageFile) : undefined;
+
     setMessage("");
     setPopupOpen(false);
 
     const newMessages: Message[] = [
       ...messages,
-      { role: "user" as const, content: userMessage },
+      { role: "user" as const, content: userMessage, imageUrl: imagePreviewUrl },
     ];
     setMessages(newMessages);
     setSending(true);
 
     try {
-      const response = await sendMessage(userMessage);
+      let response;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("message", userMessage);
+        formData.append("image", imageFile);
+        response = await sendMessage(formData);
+      } else {
+        response = await sendMessage(userMessage);
+      }
+
       newMessages.push({
         role: "assistant" as const,
         content: response.response,
@@ -167,7 +180,7 @@ export default function ChatbotPage() {
       <header className="border-b bg-white z-10 flex-shrink-0">
         <div className="mx-auto flex h-16 max-w-full items-center justify-between px-6">
           <div className="flex items-center gap-14">
-            <Link href="/">
+            <Link href="/chatbot">
               <h1 className="text-2xl font-bold text-[#0A2A8B] cursor-pointer">
                 Webson & Chatson
               </h1>
@@ -302,10 +315,19 @@ export default function ChatbotPage() {
                   {messages.map((msg, idx) => (
                     <div key={idx}>
                       {msg.role === "user" ? (
-                        /* USER BUBBLE — 75% width, right-aligned */
+                        /* USER BUBBLE — 75% width, right-aligned, dengan preview gambar */
                         <div className="flex justify-end">
-                          <div className="max-w-[75%] rounded-2xl bg-[#0A2A8B] px-5 py-3 text-white">
-                            <p className="text-sm leading-relaxed">{msg.content}</p>
+                          <div className="max-w-[75%] flex flex-col items-end gap-2">
+                            {msg.imageUrl && (
+                              <img
+                                src={msg.imageUrl}
+                                alt="uploaded"
+                                className="max-h-60 rounded-2xl object-cover border border-white/20 shadow"
+                              />
+                            )}
+                            <div className="rounded-2xl bg-[#0A2A8B] px-5 py-3 text-white">
+                              <p className="text-sm leading-relaxed">{msg.content}</p>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -339,12 +361,22 @@ export default function ChatbotPage() {
           <div className="flex-shrink-0 border-t bg-white px-6 py-8">
             <div className="max-w-3xl mx-auto">
               {attachedFiles.length > 0 && (
-                <div className="mb-2 flex items-center gap-2 rounded-2xl border bg-white px-4 py-2 text-sm text-muted-foreground shadow-sm">
-                  <Paperclip size={14} />
-                  <span>
-                    {attachedFiles.length} gambar dilampirkan:{" "}
-                    {attachedFiles.map((f) => f.name).join(", ")}
-                  </span>
+                <div className="mb-2 flex gap-2 flex-wrap">
+                  {attachedFiles.map((f, i) => (
+                    <div key={i} className="relative inline-block">
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt={f.name}
+                        className="h-20 w-20 rounded-xl object-cover border border-gray-200 shadow-sm"
+                      />
+                      <button
+                        onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-500 transition"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
