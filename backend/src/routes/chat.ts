@@ -13,6 +13,25 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// Hapus file upload lama (> 1 jam) saat server start
+function cleanOldUploads(): void {
+  const ONE_HOUR = 60 * 60 * 1000;
+  try {
+    const files = fs.readdirSync(UPLOAD_DIR);
+    files.forEach((file) => {
+      const filePath = path.join(UPLOAD_DIR, file);
+      const stat = fs.statSync(filePath);
+      if (Date.now() - stat.mtimeMs > ONE_HOUR) {
+        fs.unlinkSync(filePath);
+        console.log("[CLEANUP] Hapus file lama:", file);
+      }
+    });
+  } catch (err: any) {
+    console.warn("[CLEANUP] Gagal bersihkan uploads:", err.message);
+  }
+}
+cleanOldUploads();
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -29,11 +48,59 @@ interface ChatMessage {
   content: string;
 }
 
-const sessions = new Map<number, ChatMessage[]>();
+function sessionId(userId: number): string {
+  return `user_${userId}`;
+}
 
-function getSession(userId: number): ChatMessage[] {
-  if (!sessions.has(userId)) sessions.set(userId, []);
-  return sessions.get(userId)!;
+async function getSession(userId: number): Promise<ChatMessage[]> {
+  const rows = await prisma.n8n_chat_histories.findMany({
+    where: { session_id: sessionId(userId) },
+    orderBy: { id: "asc" },
+  });
+
+  return rows.flatMap((row) => {
+    const msg = row.message as any;
+    const role: "user" | "assistant" =
+      msg?.data?.type === "human" ? "user" : "assistant";
+    const content: string = msg?.data?.content ?? "";
+    return content ? [{ role, content }] : [];
+  });
+}
+
+async function appendSession(
+  userId: number,
+  userContent: string,
+  assistantContent: string
+): Promise<void> {
+  const sid = sessionId(userId);
+  await prisma.n8n_chat_histories.createMany({
+    data: [
+      {
+        session_id: sid,
+        message: { type: "human", data: { type: "human", content: userContent } },
+      },
+      {
+        session_id: sid,
+        message: { type: "ai", data: { type: "ai", content: assistantContent } },
+      },
+    ],
+  });
+
+  const allRows = await prisma.n8n_chat_histories.findMany({
+    where: { session_id: sid },
+    orderBy: { id: "asc" },
+    select: { id: true },
+  });
+  if (allRows.length > 40) {
+    const toDelete = allRows.slice(0, allRows.length - 40).map((r) => r.id);
+    await prisma.n8n_chat_histories.deleteMany({ where: { id: { in: toDelete } } });
+  }
+}
+
+async function clearSession(userId: number): Promise<void> {
+  await prisma.n8n_chat_histories.deleteMany({
+    where: { session_id: sessionId(userId) },
+  });
 }
 
 async function logActivity(userId: number, action: string, extras: Record<string, any> = {}): Promise<void> {
@@ -44,7 +111,6 @@ async function logActivity(userId: number, action: string, extras: Record<string
 router.post("/", requireAuth, upload.single("image"), async (req: Request, res: Response): Promise<any> => {
   const message = req.body.message?.trim();
 
-  // Debug log — cek apa yang diterima backend
   console.log("[CHAT] body:", req.body);
   console.log("[CHAT] file:", req.file
     ? { filename: req.file.filename, mimetype: req.file.mimetype, size: req.file.size, path: req.file.path }
@@ -60,26 +126,52 @@ router.post("/", requireAuth, upload.single("image"), async (req: Request, res: 
 
     // Kalau ada gambar, analisis dulu pakai Gemini Vision
     if (req.file) {
-      console.log("[CHAT] Gambar diterima, mulai analisis Gemini...");
+      console.log("[CHAT] Gambar diterima, mulai analisis...");
 
       const fileBuffer = fs.readFileSync(req.file.path);
       const base64 = fileBuffer.toString("base64");
+      const promptText = `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`;
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType: req.file.mimetype,
-            data: base64,
-          },
-        },
-        `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`,
-      ]);
+      let imageAnalysis = "";
 
-      const imageAnalysis = result.response.text();
-      console.log("[CHAT] Hasil analisis Gemini:", imageAnalysis.slice(0, 200), "...");
+      try {
+        console.log("[CHAT] Mencoba analisis dengan Gemini Cloud...");
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const result = await model.generateContent([
+          { inlineData: { mimeType: req.file.mimetype, data: base64 } }, promptText,
+        ]);
 
-      // Gabungkan pesan user + hasil analisis gambar jadi satu question
+        imageAnalysis = result.response.text();
+        console.log("[CHAT] Hasil analisis Gemini:", imageAnalysis.slice(0, 200), "...");
+
+      } catch (cloudError: any) {
+        console.warn("[CHAT] High demand, ganti ke ollama");
+
+        try {
+          const ollamaRes = await fetch("http://ollama:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "gemma3:4b",
+              prompt: promptText,
+              image: [base64],
+              stream: false,
+            }),
+          });
+
+          if (!ollamaRes.ok) throw new Error(`Ollama local gagal: ${ollamaRes.status}`);
+
+          const ollamaData = await ollamaRes.json() as any;
+          imageAnalysis = ollamaData.response;
+          console.log("[CHAT] Sukses menggunakan Ollama Lokal.");
+
+        } catch (localError: any) {
+          console.error("[CHAT] Kedua metode analisis gambar gagal total.");
+          throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+        }
+      }
+
+      console.log("[CHAT] Hasil analisis akhir:", imageAnalysis.slice(0, 200), "...");
       question = `${message}\n\n[Hasil analisis gambar]:\n${imageAnalysis}`;
     }
 
@@ -100,11 +192,8 @@ router.post("/", requireAuth, upload.single("image"), async (req: Request, res: 
     const n8nData = await n8nRes.json() as any;
     console.log("[CHAT] Response n8n:", n8nData);
 
-    // Simpan ke session memory
-    const history = getSession(req.user.id);
-    history.push({ role: "user", content: req.file ? `[Gambar] ${message}` : message });
-    history.push({ role: "assistant", content: n8nData.answer });
-    if (history.length > 40) history.splice(0, 2);
+    const userContent = req.file ? `[Gambar] ${message}` : message;
+    await appendSession(req.user.id, userContent, n8nData.answer);
 
     // Log aktivitas
     await logActivity(req.user.id, req.file ? "upload" : "chat", {
@@ -118,17 +207,26 @@ router.post("/", requireAuth, upload.single("image"), async (req: Request, res: 
   } catch (err: any) {
     console.error("[CHAT] Error:", err.message);
     res.status(500).json({ error: "Gagal mendapatkan respons." });
+  } finally {
+    // Hapus file upload setelah selesai diproses (berhasil atau gagal)
+    if (req.file?.path) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.warn("[CLEANUP] Gagal hapus file:", err.message);
+        else console.log("[CLEANUP] File dihapus:", req.file!.filename);
+      });
+    }
   }
 });
 
-// GET /api/chat/history — ambil history sesi aktif
-router.get("/history", requireAuth, (req: Request, res: Response): void => {
-  res.json({ history: getSession(req.user.id) });
+// GET /api/chat/history — ambil history sesi aktif dari PostgreSQL
+router.get("/history", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const history = await getSession(req.user.id);
+  res.json({ history });
 });
 
 // DELETE /api/chat/history — reset percakapan
 router.delete("/history", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  sessions.set(req.user.id, []);
+  await clearSession(req.user.id);
   res.json({ message: "Percakapan direset." });
 });
 
