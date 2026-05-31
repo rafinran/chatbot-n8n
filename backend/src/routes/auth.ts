@@ -33,6 +33,16 @@ router.post("/register", async (req: Request, res: Response): Promise<any> => {
 
   const hashedPassword = await bcrypt.hash(password, 12);
   await prisma.user.create({ data: { username, email, fullName, hashedPassword } });
+ 
+  const token = jwt.sign(
+    { userId: user.id, username: user.username },
+    process.env.JWT_SECRET!,
+    { expiresIn: "8h" }
+  );
+ 
+  setAuthCookie(res, token);
+  await prisma.activityLog.create({ data: { userId: user.id, action: "register" } });
+ 
 
   res.status(201).json({ message: "Registrasi berhasil." });
 });
