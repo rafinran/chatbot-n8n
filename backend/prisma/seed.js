@@ -9,10 +9,11 @@ async function main() {
     }
     await prisma.user.create({
         data: {
-            username: "admin",
-            email: "admin@epson.com",
-            fullName: "Epson",
-            hashedPassword: await bcrypt.hash("password", 12),
+          username: "admin",
+          email: "admin@epson.com",
+          fullName: "Epson",
+          hashedPassword: await bcrypt.hash("password", 12),
+          role: "ADMIN",
         },
     });
     console.log("✅ Seeding selesai! User admin dibuat.");

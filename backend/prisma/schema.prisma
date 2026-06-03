@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id             Int           @id @default(autoincrement())
   username       String        @unique
@@ -14,8 +19,25 @@ model User {
   fullName       String
   hashedPassword String
   isActive       Boolean       @default(true)
+  role           Role          @default(USER)
   createdAt      DateTime      @default(now())
   logs           ActivityLog[]
+  documents      Document[]
+}
+
+model Document {
+  id           Int      @id @default(autoincrement())
+  filename     String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  status       String   @default("processing") // processing | indexed | failed
+  errorMessage String?
+  collectionName String @default("knowledge_base")
+  uploadedById Int
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model ActivityLog {

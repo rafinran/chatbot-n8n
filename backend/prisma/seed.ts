@@ -16,7 +16,8 @@ async function main(): Promise<void> {
       username: "admin",
       email: "admin@epson.com",
       fullName: "Epson",
-      hashedPassword: await bcrypt.hash("password", 12),
+      hashedPassword: await bcrypt.hash("admin123", 12),
+      role: "ADMIN",
     },
   });
 
