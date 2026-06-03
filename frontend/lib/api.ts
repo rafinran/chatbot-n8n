@@ -104,3 +104,30 @@ export async function clearChatHistory() {
 //     return res.json();
 //   });
 // }
+
+// Admin endpoints
+export async function getDocuments() {
+  return apiCall("/admin/documents");
+}
+
+export async function uploadDocument(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/admin/documents`, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Upload failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteDocument(id: number) {
+  return apiCall(`/admin/documents/${id}`, { method: "DELETE" });
+}
