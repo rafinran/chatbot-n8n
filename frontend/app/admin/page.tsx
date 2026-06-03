@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -37,27 +38,26 @@ function formatBytes(bytes: number): string {
 
 function FileIcon({ mimeType }: { mimeType: string }) {
   if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType.includes("csv"))
-    return <FileSpreadsheet size={16} className="text-emerald-400" />;
+    return <FileSpreadsheet size={15} className="text-[#0A2A8B]" />;
   if (mimeType.includes("pdf"))
-    return <FileText size={16} className="text-red-400" />;
-  return <File size={16} className="text-blue-400" />;
+    return <FileText size={15} className="text-[#0A2A8B]" />;
+  return <File size={15} className="text-[#0A2A8B]" />;
 }
 
 function StatusBadge({ status }: { status: Document["status"] }) {
   const map = {
-    processing: { icon: <Loader2 size={12} className="animate-spin" />, label: "Memproses", cls: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
-    indexed:    { icon: <CheckCircle size={12} />,                        label: "Terindeks",  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
-    failed:     { icon: <XCircle size={12} />,                            label: "Gagal",      cls: "bg-red-500/10 text-red-400 border-red-500/20" },
+    processing: { icon: <Loader2 size={11} className="animate-spin" />, label: "Memproses", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+    indexed:    { icon: <CheckCircle size={11} />,                       label: "Terindeks",  cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    failed:     { icon: <XCircle size={11} />,                           label: "Gagal",      cls: "bg-red-50 text-red-600 border-red-200" },
   };
   const { icon, label, cls } = map[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border font-medium ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border font-medium ${cls}`}>
       {icon} {label}
     </span>
   );
 }
 
-// test
 export default function AdminPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
@@ -86,7 +86,6 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Redirect kalau bukan admin
   useEffect(() => {
     if (!authLoading) {
       if (!user) { router.push("/login"); return; }
@@ -95,7 +94,6 @@ export default function AdminPage() {
     }
   }, [authLoading, user, router, fetchDocs]);
 
-  // Poll setiap 4 detik kalau ada dokumen yang masih processing
   useEffect(() => {
     const hasProcessing = docs.some((d) => d.status === "processing");
     if (hasProcessing) {
@@ -107,7 +105,6 @@ export default function AdminPage() {
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-
     const allowed = [
       "application/pdf",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -119,7 +116,6 @@ export default function AdminPage() {
       showToast("Format tidak didukung. Gunakan PDF, DOCX, TXT, MD, CSV, atau XLSX.", "error");
       return;
     }
-
     setUploading(true);
     try {
       await uploadDocument(file);
@@ -154,58 +150,65 @@ export default function AdminPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#0c0f1a] flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-indigo-400" />
+      <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-[#0A2A8B]" />
       </div>
     );
   }
 
-  const indexed = docs.filter((d) => d.status === "indexed").length;
+  const indexed    = docs.filter((d) => d.status === "indexed").length;
   const processing = docs.filter((d) => d.status === "processing").length;
-  const failed = docs.filter((d) => d.status === "failed").length;
+  const failed     = docs.filter((d) => d.status === "failed").length;
 
   return (
-    <div className="min-h-screen bg-[#0c0f1a] text-gray-100 font-sans">
+    <div className="min-h-screen bg-[#f6f6f7] text-gray-900 font-sans">
+
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all
-          ${toast.type === "success" ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300" : "bg-red-500/10 border border-red-500/30 text-red-300"}`}>
-          {toast.type === "success" ? <CheckCircle size={16} /> : <XCircle size={16} />}
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium border transition-all
+          ${toast.type === "success"
+            ? "bg-white border-emerald-200 text-emerald-700"
+            : "bg-white border-red-200 text-red-600"}`}>
+          {toast.type === "success" ? <CheckCircle size={15} /> : <XCircle size={15} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Navbar */}
-      <nav className="border-b border-white/5 bg-[#0e1221]/80 backdrop-blur-sm sticky top-0 z-40">
+      {/* Navbar — sama persis dengan chatbot */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-              <ShieldCheck size={14} className="text-indigo-400" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A2A8B] text-white">
+              <ShieldCheck size={15} />
             </div>
-            <span className="font-semibold text-sm tracking-wide text-white">Admin Panel</span>
-            <span className="text-white/20">·</span>
+            <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span>
+            <span className="text-gray-300">·</span>
             <span className="text-xs text-gray-500">Knowledge Base Manager</span>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0A2A8B] transition"
           >
             <LogOut size={14} /> Keluar
           </button>
         </div>
-      </nav>
+      </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Terindeks", value: indexed, color: "text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10" },
-            { label: "Memproses", value: processing, color: "text-amber-400", bg: "bg-amber-500/5 border-amber-500/10" },
-            { label: "Gagal", value: failed, color: "text-red-400", bg: "bg-red-500/5 border-red-500/10" },
-          ].map(({ label, value, color, bg }) => (
-            <div key={label} className={`rounded-xl border p-4 ${bg}`}>
-              <p className="text-xs text-gray-500 mb-1">{label}</p>
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+            { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200",  dot: "bg-emerald-500" },
+            { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200",  dot: "bg-amber-400"   },
+            { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200",  dot: "bg-red-500"     },
+          ].map(({ label, value, color, bg, dot }) => (
+            <div key={label} className={`rounded-xl border p-5 shadow-sm ${bg}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-2 h-2 rounded-full ${dot}`} />
+                <p className="text-xs text-gray-500 font-medium">{label}</p>
+              </div>
+              <p className={`text-3xl font-bold ${color}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -216,8 +219,10 @@ export default function AdminPage() {
           onDragLeave={() => setDragActive(false)}
           onDrop={(e) => { e.preventDefault(); setDragActive(false); handleUpload(e.dataTransfer.files); }}
           onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none
-            ${dragActive ? "border-indigo-400 bg-indigo-500/10" : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"}
+          className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none bg-white
+            ${dragActive
+              ? "border-[#0A2A8B] bg-blue-50"
+              : "border-gray-200 hover:border-[#0A2A8B] hover:bg-blue-50/30"}
             ${uploading ? "pointer-events-none opacity-60" : ""}`}
         >
           <input
@@ -230,17 +235,17 @@ export default function AdminPage() {
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             {uploading ? (
               <>
-                <Loader2 size={28} className="animate-spin text-indigo-400" />
-                <p className="text-sm text-gray-400">Mengupload dan mengindeks...</p>
+                <Loader2 size={28} className="animate-spin text-[#0A2A8B]" />
+                <p className="text-sm text-gray-500">Mengupload dan mengindeks...</p>
               </>
             ) : (
               <>
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                  <Upload size={20} className="text-indigo-400" />
+                <div className="w-12 h-12 rounded-xl bg-[#0A2A8B] flex items-center justify-center">
+                  <Upload size={20} className="text-white" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-300">Drag & drop atau klik untuk upload</p>
-                  <p className="text-xs text-gray-600 mt-1">PDF, DOCX, TXT, MD, CSV, XLSX · Maks 50 MB</p>
+                  <p className="text-sm font-semibold text-gray-700">Drag & drop atau klik untuk upload</p>
+                  <p className="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD, CSV, XLSX · Maks 50 MB</p>
                 </div>
               </>
             )}
@@ -249,49 +254,54 @@ export default function AdminPage() {
 
         {/* Document list */}
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Database size={15} className="text-gray-500" />
-              <h2 className="text-sm font-semibold text-gray-300">Dokumen Knowledge Base</h2>
-              <span className="text-xs text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">{docs.length}</span>
+              <Database size={14} className="text-gray-400" />
+              <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                {docs.length}
+              </span>
             </div>
             <button
               onClick={fetchDocs}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition"
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
             >
-              <RefreshCw size={12} /> Refresh
+              <RefreshCw size={11} /> Refresh
             </button>
           </div>
 
           {docs.length === 0 ? (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] py-16 text-center">
-              <p className="text-sm text-gray-600">Belum ada dokumen. Upload dokumen pertama kamu.</p>
+            <div className="rounded-xl border border-gray-200 bg-white py-16 text-center shadow-sm">
+              <p className="text-sm text-gray-400">Belum ada dokumen. Upload dokumen pertama kamu.</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/5 overflow-hidden divide-y divide-white/5">
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
               {docs.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-4 px-5 py-3.5 bg-white/[0.01] hover:bg-white/[0.03] transition">
-                  <div className="flex-shrink-0">
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition"
+                >
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
                     <FileIcon mimeType={doc.mimeType} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-200 truncate">{doc.originalName}</p>
-                    <p className="text-xs text-gray-600 mt-0.5">
+                    <p className="text-sm font-medium text-gray-800 truncate">{doc.originalName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
                       {formatBytes(doc.sizeBytes)} · {doc.uploadedBy.username} ·{" "}
                       {new Date(doc.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                     {doc.status === "failed" && doc.errorMessage && (
-                      <p className="text-xs text-red-400/80 mt-1 truncate">{doc.errorMessage}</p>
+                      <p className="text-xs text-red-500 mt-1 truncate">{doc.errorMessage}</p>
                     )}
                   </div>
                   <StatusBadge status={doc.status} />
                   <button
                     onClick={() => handleDelete(doc)}
                     disabled={deletingId === doc.id}
-                    className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
+                    className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40"
                   >
                     {deletingId === doc.id
-                      ? <Loader2 size={14} className="animate-spin" />
+                      ? <Loader2 size={14} className="animate-spin text-gray-400" />
                       : <Trash2 size={14} />}
                   </button>
                 </div>
