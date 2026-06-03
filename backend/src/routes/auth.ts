@@ -32,7 +32,7 @@ router.post("/register", async (req: Request, res: Response): Promise<any> => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
-  await prisma.user.create({ data: { username, email, fullName, hashedPassword } });
+  const user = await prisma.user.create({ data: { username, email, fullName, hashedPassword } });
  
   const token = jwt.sign(
     { userId: user.id, username: user.username },
@@ -43,8 +43,10 @@ router.post("/register", async (req: Request, res: Response): Promise<any> => {
   setAuthCookie(res, token);
   await prisma.activityLog.create({ data: { userId: user.id, action: "register" } });
  
-
-  res.status(201).json({ message: "Registrasi berhasil." });
+  res.status(201).json({
+    message: "Registrasi berhasil.",
+    user: { username: user.username, fullName: user.fullName, email: user.email, role: user.role },
+  });
 });
 
 router.post("/login", async (req: Request, res: Response): Promise<any> => {
@@ -71,7 +73,7 @@ router.post("/login", async (req: Request, res: Response): Promise<any> => {
 
   res.json({
     message: "Login berhasil.",
-    user: { username: user.username, fullName: user.fullName, email: user.email },
+    user: { username: user.username, fullName: user.fullName, email: user.email, role: user.role },
   });
 });
 
@@ -82,8 +84,8 @@ router.post("/logout", requireAuth, async (req: Request, res: Response): Promise
 });
 
 router.get("/me", requireAuth, (req: Request, res: Response): void => {
-  const { username, fullName, email } = req.user;
-  res.json({ username, fullName, email });
+  const { username, fullName, email, role } = req.user;
+  res.json({ username, fullName, email, role });
 });
 
 export default router;

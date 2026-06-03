@@ -38,3 +38,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: "Sesi tidak valid atau sudah berakhir." });
   }
 }
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction): any {
+  if (!req.user || req.user.role !== "ADMIN") {
+    return res.status(403).json({ error: "Akses ditolak. Hanya admin yang diizinkan." });
+  }
+  next();
+}
