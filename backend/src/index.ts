@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.ts";
 import chatRouter from "./routes/chat.ts";
+import adminRouter from "./routes/admin.ts"
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:80",
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
     optionsSuccessStatus: 204
   })
@@ -25,6 +26,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/admin", adminRouter)
 
 app.get("/api/health", (_: Request, res: Response): void => {
   res.json({ status: "ok" });

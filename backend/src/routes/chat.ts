@@ -48,6 +48,10 @@ interface ChatMessage {
   content: string;
 }
 
+// ── PostgreSQL-backed session helpers ────────────────────────────────────────
+// History disimpan di tabel n8n_chat_histories yang juga dipakai n8n,
+// dengan session_id = "user_<userId>" supaya n8n dan backend sinkron.
+
 function sessionId(userId: number): string {
   return `user_${userId}`;
 }
@@ -58,6 +62,8 @@ async function getSession(userId: number): Promise<ChatMessage[]> {
     orderBy: { id: "asc" },
   });
 
+  // Setiap row menyimpan satu message object { type, data: { type, content } }
+  // Format ini sesuai dengan apa yang ditulis node "Postgres Chat Memory" n8n.
   return rows.flatMap((row) => {
     const msg = row.message as any;
     const role: "user" | "assistant" =
@@ -73,6 +79,7 @@ async function appendSession(
   assistantContent: string
 ): Promise<void> {
   const sid = sessionId(userId);
+  // Tulis dua row sekaligus — format sama persis dengan n8n Postgres Chat Memory
   await prisma.n8n_chat_histories.createMany({
     data: [
       {
@@ -86,6 +93,7 @@ async function appendSession(
     ],
   });
 
+  // Jaga supaya tidak lebih dari 20 pasang pesan (40 row) per user
   const allRows = await prisma.n8n_chat_histories.findMany({
     where: { session_id: sid },
     orderBy: { id: "asc" },
@@ -192,6 +200,7 @@ router.post("/", requireAuth, upload.single("image"), async (req: Request, res: 
     const n8nData = await n8nRes.json() as any;
     console.log("[CHAT] Response n8n:", n8nData);
 
+    // Simpan history ke PostgreSQL (sinkron dengan n8n_chat_histories)
     const userContent = req.file ? `[Gambar] ${message}` : message;
     await appendSession(req.user.id, userContent, n8nData.answer);
 
