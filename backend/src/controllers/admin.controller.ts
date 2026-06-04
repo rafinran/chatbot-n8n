@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import * as adminService from "../services/admin.service.ts";
-import type { UpdateStatusDto } from "../dto/admin.dto.ts";
+import { UpdateStatusSchema } from "../dto/admin.dto.ts";
 import { env } from "../config/env.ts";
 import { asyncHandler } from "../utils/asyncHandler.ts";
 
@@ -36,13 +36,12 @@ export const updateDocumentStatus = asyncHandler(async (req: Request, res: Respo
     return res.status(403).json({ error: "Forbidden." });
   }
 
-  const id = parseInt(String(req.params.id));
-  const dto = req.body as UpdateStatusDto;
-
-  if (!["indexed", "failed"].includes(dto.status)) {
-    return res.status(400).json({ error: "Status tidak valid." });
+  const parsed = UpdateStatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
 
-  await adminService.updateDocumentStatus(id, dto);
+  const id = parseInt(String(req.params.id));
+  await adminService.updateDocumentStatus(id, parsed.data);
   res.json({ message: "Status diperbarui." });
 });

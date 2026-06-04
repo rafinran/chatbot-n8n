@@ -1,15 +1,15 @@
 import type { Request, Response } from "express";
 import * as authService from "../services/auth.service.ts";
-import type { RegisterDto, LoginDto } from "../dto/auth.dto.ts";
+import { RegisterSchema, LoginSchema } from "../dto/auth.dto.ts";
 import { asyncHandler } from "../utils/asyncHandler.ts";
 
 export const register = asyncHandler(async (req: Request, res: Response): Promise<any> => {
-  const { username, email, fullName, password } = req.body as RegisterDto;
-
-  if (!username || !email || !fullName || !password) {
-    return res.status(400).json({ error: "Semua field wajib diisi." });
+  const parsed = RegisterSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
 
+  const { username, email, fullName, password } = parsed.data;
   const user = await authService.registerUser({ username, email, fullName, password });
   const token = authService.signToken(user.id, user.username);
   authService.setAuthCookie(res, token);
@@ -21,12 +21,12 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
 });
 
 export const login = asyncHandler(async (req: Request, res: Response): Promise<any> => {
-  const { username, password } = req.body as LoginDto;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: "Username dan password wajib diisi." });
+  const parsed = LoginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
 
+  const { username, password } = parsed.data;
   const user = await authService.loginUser({ username, password });
   const token = authService.signToken(user.id, user.username);
   authService.setAuthCookie(res, token);

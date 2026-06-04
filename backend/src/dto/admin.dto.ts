@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export interface DocumentResponseDto {
   id: number;
   originalName: string;
@@ -19,3 +21,16 @@ export const ALLOWED_MIMETYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
 ]);
+
+export const UpdateStatusSchema = z.object({
+  status: z.enum(["indexed", "failed"]),
+  errorMessage: z.string().optional(),
+});
+
+export const ReindexParamsSchema = z.object({
+  id: z.coerce.number().int().positive("ID tidak valid"),
+});
+
+export const DeleteParamsSchema = z.object({
+  id: z.coerce.number().int().positive("ID tidak valid"),
+});

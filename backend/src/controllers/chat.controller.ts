@@ -1,14 +1,16 @@
 import fs from "fs";
 import type { Request, Response } from "express";
 import * as chatService from "../services/chat.service.ts";
+import { SendMessageSchema } from "../dto/chat.dto.ts";
 import { asyncHandler } from "../utils/asyncHandler.ts";
 
 export const sendMessage = asyncHandler(async (req: Request, res: Response): Promise<any> => {
-  const message = req.body.message?.trim();
-
-  if (!message) {
-    return res.status(400).json({ error: "Pesan tidak boleh kosong." });
+  const parsed = SendMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
+
+  const message = parsed.data.message;
 
   try {
     let question = message;

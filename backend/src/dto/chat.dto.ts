@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export interface SendMessageDto {
   message: string;
 }
@@ -22,3 +24,7 @@ export interface ChatResponseDto {
   response: string;
   is_answered: boolean;
 }
+
+export const SendMessageSchema = z.object({
+  message: z.string().min(1, "Pesan tidak boleh kosong").max(5000, "Pesan maksimal 5000 karakter"),
+});
