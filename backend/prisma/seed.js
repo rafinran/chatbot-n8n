@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+
 const prisma = new PrismaClient();
 async function main() {
     const existing = await prisma.user.findUnique({ where: { username: "admin" } });
@@ -7,12 +8,13 @@ async function main() {
         console.log("⚠️  User admin sudah ada, skip seeding.");
         return;
     }
+    const password = process.env.ADMIN_PASSWORD;
     await prisma.user.create({
         data: {
           username: "admin",
           email: "admin@epson.com",
           fullName: "Epson",
-          hashedPassword: await bcrypt.hash("password", 12),
+          hashedPassword: await bcrypt.hash(password, 12),
           role: "ADMIN",
         },
     });
