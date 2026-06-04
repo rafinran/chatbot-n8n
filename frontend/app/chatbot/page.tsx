@@ -261,7 +261,11 @@ export default function ChatbotPage() {
                       <div className="flex-shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
                         <Bot size={14} />
                       </div>
-                      <p className="text-sm text-gray-400 italic">Thinking...</p>
+                      <div className="flex gap-1 p-3 bg-gray-100 rounded-2xl w-fit items-center">
+                        <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "0ms" }} />
+                        <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "150ms" }} />
+                        <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "300ms" }} />
+                      </div>
                     </div>
                   )}
                 </div>
