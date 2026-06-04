@@ -1,0 +1,121 @@
+
+import fs from "fs";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import prisma from "../db.ts";
+import { env, SESSION_MAX_ROWS } from "../config/env.ts";
+import type { ChatMessage, N8nResponseDto } from "../dto/chat.dto.ts";
+
+const genAI = new GoogleGenerativeAI(env.googleApiKey);
+
+// ── Session helpers ───────────────────────────────────────────────────────────
+
+export function sessionId(userId: number): string {
+  return `user_${userId}`;
+}
+
+export async function getSession(userId: number): Promise<ChatMessage[]> {
+  const rows = await prisma.n8n_chat_histories.findMany({
+    where: { session_id: sessionId(userId) },
+    orderBy: { id: "asc" },
+  });
+
+  return rows.flatMap((row) => {
+    const msg = row.message as any;
+    const role: "user" | "assistant" = msg?.data?.type === "human" ? "user" : "assistant";
+    const content: string = msg?.data?.content ?? "";
+    return content ? [{ role, content }] : [];
+  });
+}
+
+export async function appendSession(
+  userId: number,
+  userContent: string,
+  assistantContent: string
+): Promise<void> {
+  const sid = sessionId(userId);
+
+  await prisma.n8n_chat_histories.createMany({
+    data: [
+      { session_id: sid, message: { type: "human", data: { type: "human", content: userContent } } },
+      { session_id: sid, message: { type: "ai",    data: { type: "ai",    content: assistantContent } } },
+    ],
+  });
+
+  // Trim ke SESSION_MAX_ROWS
+  const allRows = await prisma.n8n_chat_histories.findMany({
+    where: { session_id: sid },
+    orderBy: { id: "asc" },
+    select: { id: true },
+  });
+  if (allRows.length > SESSION_MAX_ROWS) {
+    const toDelete = allRows.slice(0, allRows.length - SESSION_MAX_ROWS).map((r) => r.id);
+    await prisma.n8n_chat_histories.deleteMany({ where: { id: { in: toDelete } } });
+  }
+}
+
+export async function clearSession(userId: number): Promise<void> {
+  await prisma.n8n_chat_histories.deleteMany({ where: { session_id: sessionId(userId) } });
+}
+
+// ── Image analysis ────────────────────────────────────────────────────────────
+
+export async function analyzeImage(file: Express.Multer.File, message: string): Promise<string> {
+  const base64 = fs.readFileSync(file.path).toString("base64");
+  const promptText = `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`;
+
+  // Coba Gemini Cloud dulu
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent([
+      { inlineData: { mimeType: file.mimetype, data: base64 } },
+      promptText,
+    ]);
+    return result.response.text();
+  } catch {
+    console.warn("[CHAT] Gemini rate-limited, fallback ke Ollama...");
+  }
+
+  // Fallback ke Ollama lokal
+  const ollamaRes = await fetch("http://ollama:11434/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gemma3:4b", prompt: promptText, image: [base64], stream: false }),
+  });
+  if (!ollamaRes.ok) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+
+  const ollamaData = await ollamaRes.json() as any;
+  return ollamaData.response;
+}
+
+// ── n8n call ──────────────────────────────────────────────────────────────────
+
+export async function callN8n(question: string, userId: number, userEmail: string): Promise<N8nResponseDto> {
+  const res = await fetch(env.n8nWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, user_id: String(userId), user_email: userEmail }),
+  });
+  if (!res.ok) throw new Error(`n8n workflow error: ${res.status}`);
+  return res.json() as Promise<N8nResponseDto>;
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────────
+
+export async function logChatActivity(
+  userId: number,
+  message: string,
+  isAnswered: boolean,
+  hasImage: boolean,
+  imagePath?: string
+): Promise<void> {
+  await prisma.activityLog.create({
+    data: {
+      userId,
+      action: hasImage ? "upload" : "chat",
+      question: message.slice(0, 500),
+      isAnswered,
+      hasImage,
+      ...(imagePath && { imagePath }),
+    },
+  });
+}
