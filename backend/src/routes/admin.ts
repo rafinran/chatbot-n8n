@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import { requireAuth, requireAdmin } from "../middleware/auth.ts";
 import * as adminController from "../controllers/admin.controller.ts";
+import * as adminUserController from "../controllers/adminUser.controller.ts";
 import { ALLOWED_MIMETYPES } from "../dto/admin.dto.ts";
 import { DOCS_MAX_SIZE_MB } from "../config/env.ts";
 import { DOCS_DIR, ensureDocsDir } from "../services/admin.service.ts";
@@ -34,5 +35,9 @@ router.get("/documents",               requireAuth, requireAdmin, adminControlle
 router.post("/documents/:id/reindex",  requireAuth, requireAdmin, adminController.reindexDocument);
 router.delete("/documents/:id",        requireAuth, requireAdmin, adminController.deleteDocument);
 router.patch("/documents/:id/status",  adminController.updateDocumentStatus);
+
+router.get("/users",               requireAuth, requireAdmin, adminUserController.getUsers);
+router.patch("/users/:id/status",  requireAuth, requireAdmin, adminUserController.toggleUserStatus);
+router.patch("/users/:id/role",    requireAuth, requireAdmin, adminUserController.updateUserRole);
 
 export default router;

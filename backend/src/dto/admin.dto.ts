@@ -34,3 +34,11 @@ export const ReindexParamsSchema = z.object({
 export const DeleteParamsSchema = z.object({
   id: z.coerce.number().int().positive("ID tidak valid"),
 });
+
+export const ToggleUserStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export const UpdateUserRoleSchema = z.object({
+  role: z.enum(["USER", "ADMIN"]),
+});
