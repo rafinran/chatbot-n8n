@@ -2,8 +2,9 @@ import type { Request, Response } from "express";
 import * as adminService from "../services/admin.service.ts";
 import type { UpdateStatusDto } from "../dto/admin.dto.ts";
 import { env } from "../config/env.ts";
+import { asyncHandler } from "../utils/asyncHandler.ts";
 
-export async function uploadDocument(req: Request, res: Response): Promise<any> {
+export const uploadDocument = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   if (!req.file) {
     return res.status(400).json({ error: "File tidak ditemukan." });
   }
@@ -14,23 +15,22 @@ export async function uploadDocument(req: Request, res: Response): Promise<any> 
     message: "Dokumen berhasil diupload dan sedang diindeks.",
     document: { id: doc.id, originalName: doc.originalName, status: doc.status, createdAt: doc.createdAt },
   });
-}
+});
 
-export async function getDocuments(req: Request, res: Response): Promise<void> {
+export const getDocuments = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const documents = await adminService.listDocuments();
   res.json({ documents });
-}
+});
 
-export async function deleteDocument(req: Request, res: Response): Promise<any> {
+export const deleteDocument = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const id = parseInt(String(req.params.id));
   if (isNaN(id)) return res.status(400).json({ error: "ID tidak valid." });
 
   await adminService.deleteDocument(id);
   res.json({ message: "Dokumen berhasil dihapus." });
-}
+});
 
-export async function updateDocumentStatus(req: Request, res: Response): Promise<any> {
-  // Internal endpoint — validasi shared secret
+export const updateDocumentStatus = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const secret = req.headers["x-indexer-secret"];
   if (secret !== env.indexerSecret) {
     return res.status(403).json({ error: "Forbidden." });
@@ -45,4 +45,4 @@ export async function updateDocumentStatus(req: Request, res: Response): Promise
 
   await adminService.updateDocumentStatus(id, dto);
   res.json({ message: "Status diperbarui." });
-}
+});

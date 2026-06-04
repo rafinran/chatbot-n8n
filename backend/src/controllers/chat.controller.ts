@@ -1,8 +1,9 @@
 import fs from "fs";
 import type { Request, Response } from "express";
 import * as chatService from "../services/chat.service.ts";
+import { asyncHandler } from "../utils/asyncHandler.ts";
 
-export async function sendMessage(req: Request, res: Response): Promise<any> {
+export const sendMessage = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const message = req.body.message?.trim();
 
   if (!message) {
@@ -27,9 +28,6 @@ export async function sendMessage(req: Request, res: Response): Promise<any> {
     await chatService.logChatActivity(req.user.id, message, n8nData.is_answered, !!req.file, req.file?.filename);
 
     res.json({ response: n8nData.answer, is_answered: n8nData.is_answered });
-  } catch (err: any) {
-    console.error("[CHAT] Error:", err.message);
-    res.status(500).json({ error: "Gagal mendapatkan respons." });
   } finally {
     if (req.file?.path) {
       fs.unlink(req.file.path, (err) => {
@@ -37,14 +35,14 @@ export async function sendMessage(req: Request, res: Response): Promise<any> {
       });
     }
   }
-}
+});
 
-export async function getHistory(req: Request, res: Response): Promise<void> {
+export const getHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const history = await chatService.getSession(req.user.id);
   res.json({ history });
-}
+});
 
-export async function clearHistory(req: Request, res: Response): Promise<void> {
+export const clearHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   await chatService.clearSession(req.user.id);
   res.json({ message: "Percakapan direset." });
-}
+});
