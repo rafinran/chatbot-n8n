@@ -16,9 +16,11 @@ import {
   FileSpreadsheet,
   File,
   RotateCcw,
+  Users,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getDocuments, uploadDocument, deleteDocument, reindexDocument } from "@/lib/api";
+import { getDocuments, uploadDocument, deleteDocument, reindexDocument, getUsers, toggleUserStatus, updateUserRole } from "@/lib/api";
 
 interface Document {
   id: number;
@@ -29,6 +31,16 @@ interface Document {
   errorMessage?: string;
   createdAt: string;
   uploadedBy: { username: string; fullName: string };
+}
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  fullName: string;
+  role: "USER" | "ADMIN";
+  isActive: boolean;
+  createdAt: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -63,12 +75,14 @@ export default function AdminPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
   const [docs, setDocs] = useState<Document[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [tab, setTab] = useState<"documents" | "users">("documents");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -88,11 +102,21 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchUsers = async () => {
+    try {
+      const data = await getUsers();
+      setUsers(data.users);
+    } catch {
+      // silently ignore
+    }
+  };
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) { router.push("/login"); return; }
       if (user.role !== "ADMIN") { router.push("/chatbot"); return; }
       fetchDocs();
+      fetchUsers();
     }
   }, [authLoading, user, router, fetchDocs]);
 
@@ -158,6 +182,27 @@ export default function AdminPage() {
     }
   };
 
+  const handleToggleUserStatus = async (u: User) => {
+    try {
+      await toggleUserStatus(u.id, !u.isActive);
+      showToast(`User ${u.username} ${!u.isActive ? "diaktifkan" : "dinonaktifkan"}.`);
+      await fetchUsers();
+    } catch (e: any) {
+      showToast(e.message || "Gagal update status user.", "error");
+    }
+  };
+
+  const handleToggleUserRole = async (u: User) => {
+    const newRole = u.role === "ADMIN" ? "USER" : "ADMIN";
+    try {
+      await updateUserRole(u.id, newRole);
+      showToast(`Role ${u.username} diubah ke ${newRole}.`);
+      await fetchUsers();
+    } catch (e: any) {
+      showToast(e.message || "Gagal update role user.", "error");
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     router.push("/login");
@@ -189,7 +234,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Navbar — sama persis dengan chatbot */}
+      {/* Navbar */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -198,7 +243,20 @@ export default function AdminPage() {
             </div>
             <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span>
             <span className="text-gray-300">·</span>
-            <span className="text-xs text-gray-500">Knowledge Base Manager</span>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setTab("documents")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "documents" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Database size={12} className="inline mr-1" /> Dokumen
+              </button>
+              <button
+                onClick={() => setTab("users")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "users" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Users size={12} className="inline mr-1" /> Users
+              </button>
+            </div>
           </div>
           <button
             onClick={handleLogout}
@@ -211,131 +269,227 @@ export default function AdminPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200",  dot: "bg-emerald-500" },
-            { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200",  dot: "bg-amber-400"   },
-            { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200",  dot: "bg-red-500"     },
-          ].map(({ label, value, color, bg, dot }) => (
-            <div key={label} className={`rounded-xl border p-5 shadow-sm ${bg}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`w-2 h-2 rounded-full ${dot}`} />
-                <p className="text-xs text-gray-500 font-medium">{label}</p>
-              </div>
-              <p className={`text-3xl font-bold ${color}`}>{value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Upload area */}
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={(e) => { e.preventDefault(); setDragActive(false); handleUpload(e.dataTransfer.files); }}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none bg-white
-            ${dragActive
-              ? "border-[#0A2A8B] bg-blue-50"
-              : "border-gray-200 hover:border-[#0A2A8B] hover:bg-blue-50/30"}
-            ${uploading ? "pointer-events-none opacity-60" : ""}`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.docx,.txt,.md,.csv,.xlsx,.xls"
-            onChange={(e) => handleUpload(e.target.files)}
-          />
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            {uploading ? (
-              <>
-                <Loader2 size={28} className="animate-spin text-[#0A2A8B]" />
-                <p className="text-sm text-gray-500">Mengupload dan mengindeks...</p>
-              </>
-            ) : (
-              <>
-                <div className="w-12 h-12 rounded-xl bg-[#0A2A8B] flex items-center justify-center">
-                  <Upload size={20} className="text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-700">Drag & drop atau klik untuk upload</p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD, CSV, XLSX · Maks 50 MB</p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Document list */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Database size={14} className="text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                {docs.length}
-              </span>
-            </div>
-            <button
-              onClick={fetchDocs}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
-            >
-              <RefreshCw size={11} /> Refresh
-            </button>
-          </div>
-
-          {docs.length === 0 ? (
-            <div className="rounded-xl border border-gray-200 bg-white py-16 text-center shadow-sm">
-              <p className="text-sm text-gray-400">Belum ada dokumen. Upload dokumen pertama kamu.</p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
-              {docs.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition"
-                >
-                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
-                    <FileIcon mimeType={doc.mimeType} />
+        {tab === "documents" ? (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200",  dot: "bg-emerald-500" },
+                { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200",  dot: "bg-amber-400"   },
+                { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200",  dot: "bg-red-500"     },
+              ].map(({ label, value, color, bg, dot }) => (
+                <div key={label} className={`rounded-xl border p-5 shadow-sm ${bg}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`w-2 h-2 rounded-full ${dot}`} />
+                    <p className="text-xs text-gray-500 font-medium">{label}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{doc.originalName}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {formatBytes(doc.sizeBytes)} · {doc.uploadedBy.username} ·{" "}
-                      {new Date(doc.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                    {doc.status === "failed" && doc.errorMessage && (
-                      <p className="text-xs text-red-500 mt-1 truncate">{doc.errorMessage}</p>
-                    )}
-                  </div>
-                  <StatusBadge status={doc.status} />
-                  {doc.status === "failed" && (
-                    <button
-                      onClick={() => handleRetry(doc)}
-                      disabled={retryingId === doc.id}
-                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition disabled:opacity-40"
-                      title="Coba lagi"
-                    >
-                      {retryingId === doc.id
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : <RotateCcw size={14} />}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(doc)}
-                    disabled={deletingId === doc.id}
-                    className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40"
-                  >
-                    {deletingId === doc.id
-                      ? <Loader2 size={14} className="animate-spin text-gray-400" />
-                      : <Trash2 size={14} />}
-                  </button>
+                  <p className={`text-3xl font-bold ${color}`}>{value}</p>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+
+            {/* Upload area */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => { e.preventDefault(); setDragActive(false); handleUpload(e.dataTransfer.files); }}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none bg-white
+                ${dragActive
+                  ? "border-[#0A2A8B] bg-blue-50"
+                  : "border-gray-200 hover:border-[#0A2A8B] hover:bg-blue-50/30"}
+                ${uploading ? "pointer-events-none opacity-60" : ""}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.docx,.txt,.md,.csv,.xlsx,.xls"
+                onChange={(e) => handleUpload(e.target.files)}
+              />
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                {uploading ? (
+                  <>
+                    <Loader2 size={28} className="animate-spin text-[#0A2A8B]" />
+                    <p className="text-sm text-gray-500">Mengupload dan mengindeks...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-xl bg-[#0A2A8B] flex items-center justify-center">
+                      <Upload size={20} className="text-white" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-gray-700">Drag & drop atau klik untuk upload</p>
+                      <p className="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD, CSV, XLSX · Maks 50 MB</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Document list */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database size={14} className="text-gray-400" />
+                  <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                    {docs.length}
+                  </span>
+                </div>
+                <button
+                  onClick={fetchDocs}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
+                >
+                  <RefreshCw size={11} /> Refresh
+                </button>
+              </div>
+
+              {docs.length === 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-white py-16 text-center shadow-sm">
+                  <p className="text-sm text-gray-400">Belum ada dokumen. Upload dokumen pertama kamu.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
+                  {docs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
+                        <FileIcon mimeType={doc.mimeType} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{doc.originalName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {formatBytes(doc.sizeBytes)} · {doc.uploadedBy.username} ·{" "}
+                          {new Date(doc.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                        {doc.status === "failed" && doc.errorMessage && (
+                          <p className="text-xs text-red-500 mt-1 truncate">{doc.errorMessage}</p>
+                        )}
+                      </div>
+                      <StatusBadge status={doc.status} />
+                      {doc.status === "failed" && (
+                        <button
+                          onClick={() => handleRetry(doc)}
+                          disabled={retryingId === doc.id}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition disabled:opacity-40"
+                          title="Coba lagi"
+                        >
+                          {retryingId === doc.id
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <RotateCcw size={14} />}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(doc)}
+                        disabled={deletingId === doc.id}
+                        className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40"
+                      >
+                        {deletingId === doc.id
+                          ? <Loader2 size={14} className="animate-spin text-gray-400" />
+                          : <Trash2 size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* Users tab */
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Users size={14} className="text-gray-400" />
+                <h2 className="text-sm font-semibold text-gray-700">Manajemen User</h2>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                  {users.length}
+                </span>
+              </div>
+              <button
+                onClick={fetchUsers}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
+              >
+                <RefreshCw size={11} /> Refresh
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">User</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Email</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Role</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Bergabung</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50 transition">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-[#0A2A8B]/10 flex items-center justify-center">
+                            <UserCheck size={12} className="text-[#0A2A8B]" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800 text-xs">{u.fullName}</p>
+                            <p className="text-[11px] text-gray-400">@{u.username}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-600">{u.email}</td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => handleToggleUserRole(u)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${
+                            u.role === "ADMIN"
+                              ? "bg-[#0A2A8B]/10 text-[#0A2A8B] border-[#0A2A8B]/20 hover:bg-[#0A2A8B]/20"
+                              : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                          }`}
+                        >
+                          {u.role}
+                        </button>
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => handleToggleUserStatus(u)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${
+                            u.isActive
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                          }`}
+                        >
+                          {u.isActive ? "Aktif" : "Nonaktif"}
+                        </button>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500">
+                        {new Date(u.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => handleToggleUserStatus(u)}
+                          className="text-[11px] text-gray-400 hover:text-[#0A2A8B] transition font-medium"
+                        >
+                          {u.isActive ? "Nonaktifkan" : "Aktifkan"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {users.length === 0 && (
+                <div className="py-16 text-center">
+                  <p className="text-sm text-gray-400">Belum ada user terdaftar.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

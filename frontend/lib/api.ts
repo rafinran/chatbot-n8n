@@ -135,3 +135,21 @@ export async function deleteDocument(id: number) {
 export async function reindexDocument(id: number) {
   return apiCall(`/admin/documents/${id}/reindex`, { method: "POST" });
 }
+
+export async function getUsers() {
+  return apiCall("/admin/users");
+}
+
+export async function toggleUserStatus(id: number, isActive: boolean) {
+  return apiCall(`/admin/users/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+export async function updateUserRole(id: number, role: "USER" | "ADMIN") {
+  return apiCall(`/admin/users/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
