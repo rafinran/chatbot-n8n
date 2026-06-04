@@ -10,20 +10,21 @@ async function main(): Promise<void> {
     console.log("⚠️  User admin sudah ada, skip seeding.");
     return;
   }
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) throw new Error("ADMIN_PASSWORD wajib diset di .env");
 
   await prisma.user.create({
     data: {
       username: "admin",
       email: "admin@epson.com",
       fullName: "Epson",
-      hashedPassword: await bcrypt.hash("admin123", 12),
+      hashedPassword: await bcrypt.hash(password, 12),
       role: "ADMIN",
     },
   });
 
   console.log("✅ Seeding selesai! User admin dibuat.");
   console.log("   Username : admin");
-  console.log("   Password : password");
 }
 
 main()
