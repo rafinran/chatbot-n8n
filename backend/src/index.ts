@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { env } from "./config/env.ts";
+import prisma from "./db.ts";
 import authRouter  from "./routes/auth.ts";
 import chatRouter  from "./routes/chat.ts";
 import adminRouter from "./routes/admin.ts";
@@ -35,8 +36,27 @@ app.use("/api/auth",  authRouter);
 app.use("/api/chat",  chatRouter);
 app.use("/api/admin", adminRouter);
 
-app.get("/api/health", (_: Request, res: Response): void => {
-  res.json({ status: "ok", env: env.nodeEnv });
+app.get("/api/health", async (_req: Request, res: Response): Promise<void> => {
+  const checks: Record<string, string> = {
+    database: "ok",
+    indexer:  "ok",
+  };
+
+  try {
+    await prisma.$queryRawUnsafe("SELECT 1");
+  } catch {
+    checks.database = "error";
+  }
+
+  try {
+    const r = await fetch(`${env.indexerUrl}/health`, { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) checks.indexer = "error";
+  } catch {
+    checks.indexer = "error";
+  }
+
+  const allOk = Object.values(checks).every((v) => v === "ok");
+  res.status(allOk ? 200 : 503).json({ status: allOk ? "ok" : "degraded", checks });
 });
 
 // Global error handler
