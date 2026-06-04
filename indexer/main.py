@@ -15,6 +15,7 @@ from watchdog.events import FileSystemEventHandler
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 import google.generativeai as genai
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ── Config ────────────────────────────────────────────────────────────────────
 QDRANT_URL      = os.getenv("QDRANT_URL")
@@ -24,9 +25,19 @@ INDEXER_SECRET  = os.getenv("INDEXER_SECRET")
 DOCS_INBOX      = Path(os.getenv("DOCS_INBOX", "/docs-inbox"))
 GOOGLE_API_KEY  = os.getenv("GOOGLE_API_KEY")
 EMBEDDING_MODEL = "models/gemini-embedding-2"
-VECTOR_SIZE     = 1024
-CHUNK_SIZE      = 800
-CHUNK_OVERLAP   = 120
+VECTOR_SIZE     = 3072
+CHUNK_SIZE      = 1000
+CHUNK_OVERLAP   = 150
+
+BLOB_TYPE_MAP = {
+    ".pdf":  "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt":  "text/plain",
+    ".md":   "text/markdown",
+    ".csv":  "text/csv",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls":  "application/vnd.ms-excel",
+}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -125,20 +136,32 @@ def extract_text(file_path: Path) -> str:
 
 
 # ── Chunking — pakai recursive character splitter mirip n8n ──────────────────
-def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
-    """
-    Split by character count (bukan word count) supaya konsisten
-    dengan RecursiveCharacterTextSplitter di n8n.
-    """
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + size
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        start += size - overlap
-    return chunks
+def _char_pos_to_lines(text: str, char_pos: int) -> int:
+    return text[:char_pos].count("\n") + 1
+
+
+def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[dict]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""],
+        length_function=len,
+    )
+    chunk_strings = splitter.split_text(text)
+    results: list[dict] = []
+    for chunk in chunk_strings:
+        start = text.find(chunk)
+        end = start + len(chunk) if start != -1 else -1
+        results.append({
+            "content": chunk,
+            "loc": {
+                "lines": {
+                    "from": _char_pos_to_lines(text, start) if start != -1 else 0,
+                    "to": _char_pos_to_lines(text, end) if end != -1 else 0,
+                }
+            },
+        })
+    return results
 
 
 # ── Indexer core ──────────────────────────────────────────────────────────────
@@ -152,11 +175,15 @@ async def index_document(doc_id: int, file_path: Path, original_name: str):
         chunks = chunk_text(text)
         log.info("[doc_%d] %d chunks dari %d karakter", doc_id, len(chunks), len(text))
 
-        # Embed batch 100 (limit Gemini per request)
+        suffix = file_path.suffix.lower()
+        blob_type = BLOB_TYPE_MAP.get(suffix, "application/octet-stream")
+
+        chunk_contents = [c["content"] for c in chunks]
+
         BATCH = 100
         all_vectors: list[list[float]] = []
-        for i in range(0, len(chunks), BATCH):
-            batch = chunks[i : i + BATCH]
+        for i in range(0, len(chunk_contents), BATCH):
+            batch = chunk_contents[i : i + BATCH]
             all_vectors.extend(embed_chunks(batch))
             log.info("[doc_%d] Embedded %d/%d chunks", doc_id, min(i + BATCH, len(chunks)), len(chunks))
 
@@ -167,13 +194,15 @@ async def index_document(doc_id: int, file_path: Path, original_name: str):
             points.append(PointStruct(
                 id=point_id,
                 vector=vector,
-                # Format payload SAMA dengan yang n8n hasilkan
                 payload={
-                    "pageContent": chunk,
+                    "content": chunk["content"],
                     "metadata": {
-                        "source": original_name,
+                        "source": "blob",
+                        "blobType": blob_type,
                         "doc_id": doc_id,
-                        "chunk_index": i,
+                        "original_name": original_name,
+                        "line": chunk["loc"]["lines"]["from"],
+                        "loc": chunk["loc"],
                     },
                 },
             ))
