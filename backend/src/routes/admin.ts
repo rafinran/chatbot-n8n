@@ -31,6 +31,7 @@ const router = Router();
 
 router.post("/documents",              requireAuth, requireAdmin, upload.single("file"), adminController.uploadDocument);
 router.get("/documents",               requireAuth, requireAdmin, adminController.getDocuments);
+router.post("/documents/:id/reindex",  requireAuth, requireAdmin, adminController.reindexDocument);
 router.delete("/documents/:id",        requireAuth, requireAdmin, adminController.deleteDocument);
 router.patch("/documents/:id/status",  adminController.updateDocumentStatus);
 

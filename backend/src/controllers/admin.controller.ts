@@ -30,6 +30,14 @@ export const deleteDocument = asyncHandler(async (req: Request, res: Response): 
   res.json({ message: "Dokumen berhasil dihapus." });
 });
 
+export const reindexDocument = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) return res.status(400).json({ error: "ID tidak valid." });
+
+  await adminService.reindexDocument(id, req.user.id);
+  res.json({ message: "Proses re-index dimulai." });
+});
+
 export const updateDocumentStatus = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const secret = req.headers["x-indexer-secret"];
   if (secret !== env.indexerSecret) {

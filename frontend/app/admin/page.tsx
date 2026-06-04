@@ -15,9 +15,10 @@ import {
   RefreshCw,
   FileSpreadsheet,
   File,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getDocuments, uploadDocument, deleteDocument } from "@/lib/api";
+import { getDocuments, uploadDocument, deleteDocument, reindexDocument } from "@/lib/api";
 
 interface Document {
   id: number;
@@ -66,6 +67,7 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -140,6 +142,19 @@ export default function AdminPage() {
       showToast(e.message || "Gagal menghapus dokumen.", "error");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleRetry = async (doc: Document) => {
+    setRetryingId(doc.id);
+    try {
+      await reindexDocument(doc.id);
+      showToast(`Re-index "${doc.originalName}" dimulai.`);
+      await fetchDocs();
+    } catch (e: any) {
+      showToast(e.message || "Gagal re-index dokumen.", "error");
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -295,6 +310,18 @@ export default function AdminPage() {
                     )}
                   </div>
                   <StatusBadge status={doc.status} />
+                  {doc.status === "failed" && (
+                    <button
+                      onClick={() => handleRetry(doc)}
+                      disabled={retryingId === doc.id}
+                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition disabled:opacity-40"
+                      title="Coba lagi"
+                    >
+                      {retryingId === doc.id
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : <RotateCcw size={14} />}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(doc)}
                     disabled={deletingId === doc.id}

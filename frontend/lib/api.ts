@@ -131,3 +131,7 @@ export async function uploadDocument(file: File) {
 export async function deleteDocument(id: number) {
   return apiCall(`/admin/documents/${id}`, { method: "DELETE" });
 }
+
+export async function reindexDocument(id: number) {
+  return apiCall(`/admin/documents/${id}/reindex`, { method: "POST" });
+}

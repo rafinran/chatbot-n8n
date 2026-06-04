@@ -32,6 +32,7 @@ services:
       INDEXER_SECRET:        ${INDEXER_SECRET}
     volumes:
       - docs_inbox:/app/docs-inbox
+      - documents_storage:/app/documents
     expose:
       - "8000"
     depends_on:
@@ -123,4 +124,5 @@ volumes:
   qdrant_data:
   ollama_data:
   docs_inbox:
+  documents_storage:
 
