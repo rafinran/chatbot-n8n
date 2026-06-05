@@ -91,8 +91,7 @@ pipeline {
             steps {
                 echo '🐳 Building Docker images...'
                 sh """
-                    cd ${APP_DIR}
-                    git pull origin main
+                    cp -r . ${APP_DIR}
                     docker compose -f ${COMPOSE_FILE} build --no-cache
                 """
             }
