@@ -5,6 +5,7 @@ pipeline {
         APP_DIR       = '/home/rafinran/chatbot-n8n'
         COMPOSE_FILE  = "${APP_DIR}/docker-compose.yaml"
         HEALTH_URL    = 'http://localhost/api/health'
+        PATH         = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
     }
 
     options {
