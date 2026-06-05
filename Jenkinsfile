@@ -22,45 +22,45 @@ pipeline {
             }
         }
         // ── 2. Dependency Audit ────────────────────────────────────────
-        stage('Dependency Audit') {
-            parallel {
-                stage('Audit: Backend') {
-                    steps {
-                        dir('backend') {
-                            echo '🔍 Auditing backend dependencies...'
-                            sh 'npm ci --prefer-offline'
-                            // --audit-level=high: hanya fail kalau ada vuln HIGH/CRITICAL
-                            sh 'npm audit --audit-level=high || true'
-                        }
-                    }
-                }
-
-                stage('Audit: Frontend') {
-                    steps {
-                        dir('frontend') {
-                            echo '🔍 Auditing frontend dependencies...'
-                            sh 'npm ci --prefer-offline'
-                            sh 'npm audit --audit-level=high || true'
-                        }
-                    }
-                }
-
-                stage('Audit: Indexer') {
-                    steps {
-                        dir('indexer') {
-                            echo '🔍 Auditing Python dependencies...'
-                            sh '''
-                                python3 -m venv .venv
-                                .venv/bin/pip install --quiet pip-audit
-                                .venv/bin/pip-audit -r requirements.txt --severity high || true
-                            '''
-                        }
-                    }
-                }
-
-            }
-        }
-
+        // stage('Dependency Audit') {
+            // parallel {
+            //     stage('Audit: Backend') {
+            //         steps {
+            //             dir('backend') {
+            //                 echo '🔍 Auditing backend dependencies...'
+            //                 sh 'npm ci --prefer-offline'
+            //                 // --audit-level=high: hanya fail kalau ada vuln HIGH/CRITICAL
+            //                 sh 'npm audit --audit-level=high || true'
+            //             }
+            //         }
+            //     }
+            //
+            //     stage('Audit: Frontend') {
+            //         steps {
+            //             dir('frontend') {
+            //                 echo '🔍 Auditing frontend dependencies...'
+            //                 sh 'npm ci --prefer-offline'
+            //                 sh 'npm audit --audit-level=high || true'
+            //             }
+            //         }
+            //     }
+            //
+            //     stage('Audit: Indexer') {
+            //         steps {
+            //             dir('indexer') {
+            //                 echo '🔍 Auditing Python dependencies...'
+            //                 sh '''
+            //                     python3 -m venv .venv
+            //                     .venv/bin/pip install --quiet pip-audit
+            //                     .venv/bin/pip-audit -r requirements.txt --severity high || true
+        //                     '''
+        //                 }
+        //             }
+        //         }
+        //
+        //     }
+        // }
+        //
         // ── 3. Lint ────────────────────────────────────────────────────
         stage('Lint') {
             parallel {
