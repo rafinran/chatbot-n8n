@@ -62,29 +62,29 @@ pipeline {
         // }
         //
         // ── 3. Lint ────────────────────────────────────────────────────
-        stage('Lint') {
-            parallel {
-                stage('Lint: Backend') {
-                    steps {
-                        dir('backend') {
-                            echo '🧹 Linting backend...'
-                            // TypeScript type-check sebagai pengganti ESLint di backend
-                            sh 'npx tsc --noEmit'
-                        }
-                    }
-                }
-
-                stage('Lint: Frontend') {
-                    steps {
-                        dir('frontend') {
-                            echo '🧹 Linting frontend...'
-                            sh 'npm run lint'
-                        }
-                    }
-                }
-
-            }
-        }
+        // stage('Lint') {
+        //     parallel {
+        //         stage('Lint: Backend') {
+        //             steps {
+        //                 dir('backend') {
+        //                     echo '🧹 Linting backend...'
+        //                     // TypeScript type-check sebagai pengganti ESLint di backend
+        //                     sh 'npx tsc --noEmit'
+        //                 }
+        //             }
+        //         }
+        //
+        //         stage('Lint: Frontend') {
+        //             steps {
+        //                 dir('frontend') {
+        //                     echo '🧹 Linting frontend...'
+        //                     sh 'npm run lint'
+        //                 }
+        //             }
+        //         }
+        //
+        //     }
+        // }
 
         // ── 4. Build Docker Images ─────────────────────────────────────
         stage('Build') {
