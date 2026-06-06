@@ -6,7 +6,10 @@ import { asyncHandler } from "../utils/asyncHandler.ts";
 export const register = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const parsed = RegisterSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    const messages = Object.values(parsed.error.flatten().fieldErrors)
+      .flat()
+      .join(", ");
+    return res.status(400).json({ error: messages });
   }
 
   const { username, email, fullName, password } = parsed.data;
@@ -23,7 +26,10 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
 export const login = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+  const messages = Object.values(parsed.error.flatten().fieldErrors)
+    .flat()
+    .join(", ");
+  return res.status(400).json({ error: messages });
   }
 
   const { username, password } = parsed.data;
