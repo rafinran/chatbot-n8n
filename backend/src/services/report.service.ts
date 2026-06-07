@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from "../db.ts";
 import { env } from "../config/env.ts";
