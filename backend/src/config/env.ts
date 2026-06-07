@@ -14,6 +14,10 @@ export const env = {
   indexerUrl:     process.env.INDEXER_URL || "http://indexer:5000",
   indexerSecret:  required("INDEXER_SECRET"),
   databaseUrl:    required("DATABASE_URL"),
+  gmailUser:        required("GMAIL_USER"),
+  gmailAppPassword: required("GMAIL_APP_PASSWORD"),
+  reportRecipient:  required("REPORT_RECIPIENT"),
+  openRouterApiKey: process.env.OPENROUTER_API_KEY,
 } as const;
 
 export const COOKIE_MAX_AGE = 8 * 60 * 60 * 1000; // 8 jam
