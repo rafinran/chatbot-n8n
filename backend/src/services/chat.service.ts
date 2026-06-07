@@ -58,33 +58,47 @@ export async function clearSession(userId: number): Promise<void> {
 }
 
 // ── Image analysis ────────────────────────────────────────────────────────────
-
 export async function analyzeImage(file: Express.Multer.File, message: string): Promise<string> {
   const base64 = fs.readFileSync(file.path).toString("base64");
   const promptText = `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`;
 
   // Coba Gemini Cloud dulu
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash" });
     const result = await model.generateContent([
-      { inlineData: { mimeType: file.mimetype, data: base64 } },
       promptText,
+      { inlineData: { mimeType: file.mimetype, data: base64 } },
     ]);
     return result.response.text();
-  } catch {
-    console.warn("[CHAT] Gemini rate-limited, fallback ke Ollama...");
+  } catch (err) {
+    console.error("[CHAT] Gemini error: ", err)
+    console.warn("[CHAT] Fallback ke openRouter...");
   }
 
-  // Fallback ke Ollama lokal
-  const ollamaRes = await fetch("http://ollama:11434/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "gemma3:4b", prompt: promptText, image: [base64], stream: false }),
-  });
-  if (!ollamaRes.ok) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+  // Fallback via OpenRouter
+  if (!env.openRouterApiKey) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
 
-  const ollamaData = await ollamaRes.json() as any;
-  return ollamaData.response;
+  const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${env.openRouterApiKey}`,
+    },
+    body: JSON.stringify({
+      model: "qwen/qwen3.5-flash-02-23",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: promptText },
+          { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
+        ],
+      }],
+    }),
+  });
+  if (!orRes.ok) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+
+  const orData = await orRes.json() as any;
+  return orData.choices?.[0]?.message?.content ?? "";
 }
 
 // ── n8n call ──────────────────────────────────────────────────────────────────
