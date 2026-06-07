@@ -9,6 +9,7 @@ import prisma from "./db.ts";
 import authRouter  from "./routes/auth.ts";
 import chatRouter  from "./routes/chat.ts";
 import adminRouter from "./routes/admin.ts";
+import reportRouter from "./routes/report.ts";
 
 const app: Express = express();
 
@@ -35,6 +36,7 @@ app.use(cookieParser());
 app.use("/api/auth",  authRouter);
 app.use("/api/chat",  chatRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/reports", reportRouter);
 
 app.get("/api/health", async (_req: Request, res: Response): Promise<void> => {
   const checks: Record<string, string> = {

@@ -18,9 +18,22 @@ import {
   RotateCcw,
   Users,
   UserCheck,
+  BarChart2,
+  Send,
+  CalendarDays,
+  CalendarRange,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getDocuments, uploadDocument, deleteDocument, reindexDocument, getUsers, toggleUserStatus, updateUserRole } from "@/lib/api";
+import {
+  getDocuments,
+  uploadDocument,
+  deleteDocument,
+  reindexDocument,
+  getUsers,
+  toggleUserStatus,
+  updateUserRole,
+} from "@/lib/api";
 
 interface Document {
   id: number;
@@ -52,8 +65,7 @@ function formatBytes(bytes: number): string {
 function FileIcon({ mimeType }: { mimeType: string }) {
   if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType.includes("csv"))
     return <FileSpreadsheet size={15} className="text-[#0A2A8B]" />;
-  if (mimeType.includes("pdf"))
-    return <FileText size={15} className="text-[#0A2A8B]" />;
+  if (mimeType.includes("pdf")) return <FileText size={15} className="text-[#0A2A8B]" />;
   return <File size={15} className="text-[#0A2A8B]" />;
 }
 
@@ -71,6 +83,155 @@ function StatusBadge({ status }: { status: Document["status"] }) {
   );
 }
 
+// ── Report Tab ─────────────────────────────────────────────────────────────
+
+function ReportTab() {
+  const [sending, setSending] = useState<"daily" | "weekly" | null>(null);
+  const [lastSent, setLastSent] = useState<{ type: string; time: string } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleSend = async (type: "daily" | "weekly") => {
+    setSending(type);
+    try {
+      const res = await fetch(`/api/reports/send?type=${type}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengirim laporan.");
+      showToast(data.message, "success");
+      setLastSent({ type: type === "daily" ? "Harian" : "Mingguan", time: new Date().toLocaleTimeString("id-ID") });
+    } catch (e: any) {
+      showToast(e.message || "Gagal mengirim laporan.", "error");
+    } finally {
+      setSending(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border
+          ${toast.type === "success"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+            : "bg-red-50 border-red-200 text-red-600"}`}>
+          {toast.type === "success" ? <CheckCircle size={15} /> : <XCircle size={15} />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header info */}
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 flex items-start gap-3">
+        <Mail size={16} className="text-[#0A2A8B] mt-0.5 flex-shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-[#0A2A8B]">Kirim Laporan via Email</p>
+          <p className="text-xs text-blue-600 mt-0.5">
+            Laporan berisi ringkasan aktivitas chat, topik yang sering ditanyakan, analisis gap FAQ, dan user paling aktif.
+            Dikirim via Gmail ke email atasan yang dikonfigurasi di server.
+          </p>
+        </div>
+      </div>
+
+      {/* Report cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Daily */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+              <CalendarDays size={18} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Laporan Harian</p>
+              <p className="text-xs text-gray-400 mt-0.5">Aktivitas hari ini (00:00 – sekarang)</p>
+            </div>
+          </div>
+
+          <ul className="space-y-1.5 text-xs text-gray-500">
+            {["Total & % chat terjawab hari ini", "Topik pertanyaan terbanyak", "Pertanyaan tidak terjawab (gap FAQ)", "User paling aktif"].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0" />
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={() => handleSend("daily")}
+            disabled={sending !== null}
+            className="mt-auto flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending === "daily" ? (
+              <><Loader2 size={14} className="animate-spin" /> Mengirim...</>
+            ) : (
+              <><Send size={14} /> Kirim Laporan Harian</>
+            )}
+          </button>
+        </div>
+
+        {/* Weekly */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0A2A8B]/10 border border-[#0A2A8B]/10 flex items-center justify-center">
+              <CalendarRange size={18} className="text-[#0A2A8B]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Laporan Mingguan</p>
+              <p className="text-xs text-gray-400 mt-0.5">Aktivitas minggu ini (Senin – sekarang)</p>
+            </div>
+          </div>
+
+          <ul className="space-y-1.5 text-xs text-gray-500">
+            {["Total & % chat terjawab minggu ini", "Clustering topik via AI (Gemini)", "Analisis gap FAQ dengan AI", "5 user paling aktif minggu ini"].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-[#0A2A8B] flex-shrink-0" />
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={() => handleSend("weekly")}
+            disabled={sending !== null}
+            className="mt-auto flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#0A2A8B] hover:bg-[#0c35b0] text-white text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending === "weekly" ? (
+              <><Loader2 size={14} className="animate-spin" /> Mengirim...</>
+            ) : (
+              <><Send size={14} /> Kirim Laporan Mingguan</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Last sent info */}
+      {lastSent && (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <CheckCircle size={12} className="text-emerald-500" />
+          Laporan {lastSent.type} terakhir dikirim pukul {lastSent.time}
+        </div>
+      )}
+
+      {/* Note */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 px-5 py-4">
+        <p className="text-xs font-semibold text-gray-600 mb-2">Catatan Konfigurasi</p>
+        <ul className="space-y-1 text-xs text-gray-400">
+          <li>• Email tujuan dikonfigurasi via env var <code className="bg-gray-100 px-1 rounded">REPORT_RECIPIENT</code> di server</li>
+          <li>• Pastikan <code className="bg-gray-100 px-1 rounded">GMAIL_USER</code> dan <code className="bg-gray-100 px-1 rounded">GMAIL_APP_PASSWORD</code> sudah diset</li>
+          <li>• Proses pengiriman bisa memakan waktu 10–30 detik karena analisis AI</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────
+
 export default function AdminPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
@@ -82,7 +243,7 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [tab, setTab] = useState<"documents" | "users">("documents");
+  const [tab, setTab] = useState<"documents" | "users" | "reports">("documents");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -248,13 +409,19 @@ export default function AdminPage() {
                 onClick={() => setTab("documents")}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "documents" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
               >
-                <Database size={12} className="inline mr-1" /> Dokumen
+                <Database size={12} className="inline mr-1" />Dokumen
               </button>
               <button
                 onClick={() => setTab("users")}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "users" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
               >
-                <Users size={12} className="inline mr-1" /> Users
+                <Users size={12} className="inline mr-1" />Users
+              </button>
+              <button
+                onClick={() => setTab("reports")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "reports" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <BarChart2 size={12} className="inline mr-1" />Laporan
               </button>
             </div>
           </div>
@@ -269,14 +436,14 @@ export default function AdminPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
-        {tab === "documents" ? (
+        {tab === "documents" && (
           <>
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200",  dot: "bg-emerald-500" },
-                { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200",  dot: "bg-amber-400"   },
-                { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200",  dot: "bg-red-500"     },
+                { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200", dot: "bg-emerald-500" },
+                { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200", dot: "bg-amber-400"   },
+                { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200", dot: "bg-red-500"     },
               ].map(({ label, value, color, bg, dot }) => (
                 <div key={label} className={`rounded-xl border p-5 shadow-sm ${bg}`}>
                   <div className="flex items-center gap-2 mb-2">
@@ -295,9 +462,7 @@ export default function AdminPage() {
               onDrop={(e) => { e.preventDefault(); setDragActive(false); handleUpload(e.dataTransfer.files); }}
               onClick={() => !uploading && fileInputRef.current?.click()}
               className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none bg-white
-                ${dragActive
-                  ? "border-[#0A2A8B] bg-blue-50"
-                  : "border-gray-200 hover:border-[#0A2A8B] hover:bg-blue-50/30"}
+                ${dragActive ? "border-[#0A2A8B] bg-blue-50" : "border-gray-200 hover:border-[#0A2A8B] hover:bg-blue-50/30"}
                 ${uploading ? "pointer-events-none opacity-60" : ""}`}
             >
               <input
@@ -333,14 +498,9 @@ export default function AdminPage() {
                 <div className="flex items-center gap-2">
                   <Database size={14} className="text-gray-400" />
                   <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                    {docs.length}
-                  </span>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">{docs.length}</span>
                 </div>
-                <button
-                  onClick={fetchDocs}
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
-                >
+                <button onClick={fetchDocs} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
                   <RefreshCw size={11} /> Refresh
                 </button>
               </div>
@@ -352,10 +512,7 @@ export default function AdminPage() {
               ) : (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
                   {docs.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition"
-                    >
+                    <div key={doc.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition">
                       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
                         <FileIcon mimeType={doc.mimeType} />
                       </div>
@@ -377,9 +534,7 @@ export default function AdminPage() {
                           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition disabled:opacity-40"
                           title="Coba lagi"
                         >
-                          {retryingId === doc.id
-                            ? <Loader2 size={14} className="animate-spin" />
-                            : <RotateCcw size={14} />}
+                          {retryingId === doc.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                         </button>
                       )}
                       <button
@@ -387,9 +542,7 @@ export default function AdminPage() {
                         disabled={deletingId === doc.id}
                         className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40"
                       >
-                        {deletingId === doc.id
-                          ? <Loader2 size={14} className="animate-spin text-gray-400" />
-                          : <Trash2 size={14} />}
+                        {deletingId === doc.id ? <Loader2 size={14} className="animate-spin text-gray-400" /> : <Trash2 size={14} />}
                       </button>
                     </div>
                   ))}
@@ -397,21 +550,17 @@ export default function AdminPage() {
               )}
             </div>
           </>
-        ) : (
-          /* Users tab */
+        )}
+
+        {tab === "users" && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Users size={14} className="text-gray-400" />
                 <h2 className="text-sm font-semibold text-gray-700">Manajemen User</h2>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                  {users.length}
-                </span>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">{users.length}</span>
               </div>
-              <button
-                onClick={fetchUsers}
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition"
-              >
+              <button onClick={fetchUsers} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
                 <RefreshCw size={11} /> Refresh
               </button>
             </div>
@@ -490,6 +639,9 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {tab === "reports" && <ReportTab />}
+
       </main>
     </div>
   );
