@@ -23,6 +23,10 @@ import {
   CalendarDays,
   CalendarRange,
   Mail,
+  Home,
+  AlertTriangle,
+  Clock3,
+  MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -230,6 +234,173 @@ function ReportTab() {
   );
 }
 
+function OverviewTab() {
+  const stats = {
+    totalChat: 47,
+    answered: 78,
+    responseTime: 3.2,
+    pendingEscalation: 5,
+  };
+
+  const topTopics = [
+    { label: "Kualitas cetak", total: 110 },
+    { label: "Masalah tinta", total: 88 },
+    { label: "Koneksi WiFi", total: 62 },
+    { label: "Update firmware", total: 47 },
+    { label: "Install driver", total: 33 },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">
+            Overview
+          </h2>
+          <p className="text-sm text-gray-400">
+            Terakhir diperbarui: {new Date().toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">
+          <RefreshCw size={14} />
+          Refresh
+        </button>
+      </div>
+
+      {/* KPI */}
+
+      <div className="grid md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <MessageCircle size={14} />
+            Total Chat Hari Ini
+          </div>
+
+          <div className="text-4xl font-bold text-blue-600 mt-2">
+            {stats.totalChat}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <CheckCircle size={14} />
+            Chat Terjawab
+          </div>
+
+          <div className="text-4xl font-bold text-green-600 mt-2">
+            {stats.answered}%
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <Clock3 size={14} />
+            Avg Response
+          </div>
+
+          <div className="text-4xl font-bold text-amber-600 mt-2">
+            {stats.responseTime}s
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <AlertTriangle size={14} />
+            Eskalasi Pending
+          </div>
+
+          <div className="text-4xl font-bold text-red-500 mt-2">
+            {stats.pendingEscalation}
+          </div>
+        </div>
+      </div>
+
+      {/* Chart Dummy */}
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border p-5">
+          <h3 className="font-semibold mb-4">
+            Volume Chat 7 Hari Terakhir
+          </h3>
+
+          <div className="h-64 flex items-end gap-3">
+            {[28, 34, 18, 41, 33, 44, 47].map((v, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-blue-500 rounded-t"
+                style={{ height: `${v * 4}px` }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <h3 className="font-semibold mb-4">
+            Top 5 Topik Pertanyaan
+          </h3>
+
+          <div className="space-y-4">
+            {topTopics.map((topic) => (
+              <div key={topic.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{topic.label}</span>
+                  <span>{topic.total}</span>
+                </div>
+
+                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500"
+                    style={{
+                      width: `${topic.total / 1.1}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Items */}
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+          <h3 className="font-semibold text-yellow-700">
+            5 Tiket Eskalasi Pending
+          </h3>
+
+          <p className="text-sm text-yellow-600 mt-2">
+            Belum ada agen yang menangani tiket hari ini.
+          </p>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+          <h3 className="font-semibold text-red-700">
+            3 Dokumen Gagal Diindeks
+          </h3>
+
+          <p className="text-sm text-red-600 mt-2">
+            Perlu dilakukan re-indexing.
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+          <h3 className="font-semibold text-blue-700">
+            8 FAQ Gap Baru
+          </h3>
+
+          <p className="text-sm text-blue-600 mt-2">
+            Belum ada jawaban di knowledge base.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -243,7 +414,7 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [tab, setTab] = useState<"documents" | "users" | "reports">("documents");
+  const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports">("overview");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -406,6 +577,17 @@ export default function AdminPage() {
             <span className="text-gray-300">·</span>
             <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
               <button
+                  onClick={() => setTab("overview")}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                    tab === "overview"
+                      ? "bg-white shadow text-[#0A2A8B]"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Home size={12} className="inline mr-1" />
+                  Overview
+                </button>
+              <button
                 onClick={() => setTab("documents")}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "documents" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
               >
@@ -435,6 +617,7 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+        {tab === "overview" && <OverviewTab />}
 
         {tab === "documents" && (
           <>
