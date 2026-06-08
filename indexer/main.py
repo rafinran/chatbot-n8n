@@ -225,11 +225,15 @@ async def index_document(doc_id: int, file_path: Path, original_name: str):
 
 
 async def _update_status(doc_id: int, status: str, error: str = None):
+    payload = {"status": status}
+    if error is not None:
+        payload["errorMessage"] = error
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.patch(
                 f"{BACKEND_URL}/api/admin/documents/{doc_id}/status",
-                json={"status": status, "errorMessage": error},
+                json=payload,
                 headers={"x-indexer-secret": INDEXER_SECRET},
                 timeout=10,
             )
