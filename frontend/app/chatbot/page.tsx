@@ -15,6 +15,9 @@ import {
   LogOut,
   Menu,
   ExternalLink,
+  ThumbsUp,
+  ThumbsDown,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,11 +25,16 @@ import { Input } from "@/components/ui/input";
 import { sendMessage, getChatHistory, logout } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
 interface Message {
+  id: string;                              // ← BARU: dipakai untuk track feedback
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
 }
+
+type FeedbackState = "idle" | "satisfied" | "escalated";
 
 interface LinkMeta {
   title?: string;
@@ -42,9 +50,74 @@ const suggestions = [
   "How do I fix a paper jam issue?",
 ];
 
-/* ─────────────────────────────────────────────
-   Hook: fetch Open Graph metadata for a URL
-───────────────────────────────────────────── */
+// ── Feedback Buttons ───────────────────────────────────────────────────────
+
+function FeedbackButtons({ messageId }: { messageId: string }) {
+  const [state, setState] = useState<FeedbackState>("idle");
+
+  if (state === "satisfied") {
+    return (
+      <p className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-400">
+        <ThumbsUp size={12} className="text-emerald-500" />
+        Terima kasih atas feedback kamu!
+      </p>
+    );
+  }
+
+  if (state === "escalated") {
+    return (
+      <div className="mt-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
+        <div className="flex items-start gap-2">
+          <Zap size={14} className="text-amber-600 mt-0.5" />
+
+          <div>
+            <p className="text-sm font-medium text-amber-800">
+              Chat diteruskan ke Customer Service
+            </p>
+
+            <p className="mt-1 text-xs text-amber-700">
+              Kami mencatat bahwa jawaban AI belum menyelesaikan masalah Anda.
+              Percakapan ini akan diteruskan ke tim Customer Service untuk
+              ditinjau lebih lanjut.
+            </p>
+
+            <p className="mt-2 text-xs text-amber-600">
+              Nomor tiket: CS-{messageId.slice(0, 8).toUpperCase()}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 flex items-center gap-3">
+      <p className="text-xs text-gray-400">
+        Apakah jawaban ini membantu?
+      </p>
+
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setState("satisfied")}
+          className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+        >
+          <ThumbsUp size={11} />
+          Ya
+        </button>
+
+        <button
+          onClick={() => setState("escalated")}
+          className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-500"
+        >
+          <ThumbsDown size={11} />
+          Tidak
+        </button>
+      </div>
+    </div>
+  );
+}
+// ── useLinkPreview ─────────────────────────────────────────────────────────
+
 function useLinkPreview(url: string) {
   const [meta, setMeta] = useState<LinkMeta | null>(null);
 
@@ -66,9 +139,8 @@ function useLinkPreview(url: string) {
   return meta;
 }
 
-/* ─────────────────────────────────────────────
-   Link Preview Card
-───────────────────────────────────────────── */
+// ── LinkPreviewCard ────────────────────────────────────────────────────────
+
 function LinkPreviewCard({ url }: { url: string }) {
   const meta = useLinkPreview(url);
 
@@ -79,7 +151,6 @@ function LinkPreviewCard({ url }: { url: string }) {
       rel="noopener noreferrer"
       className="mt-2 flex items-stretch overflow-hidden rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors no-underline max-w-sm"
     >
-      {/* Thumbnail */}
       <div className="flex w-16 flex-shrink-0 items-center justify-center bg-gray-100 sm:w-20">
         {meta?.image ? (
           <img
@@ -95,7 +166,6 @@ function LinkPreviewCard({ url }: { url: string }) {
         )}
       </div>
 
-      {/* Info */}
       <div className="flex min-w-0 flex-col justify-center px-3 py-2">
         {meta?.title ? (
           <p className="truncate text-xs font-medium text-gray-800 sm:text-sm">
@@ -104,6 +174,7 @@ function LinkPreviewCard({ url }: { url: string }) {
         ) : (
           <p className="truncate text-xs text-gray-500">{url}</p>
         )}
+
         <p className="mt-0.5 truncate text-[11px] text-gray-400">
           {meta?.domain ?? ""}
         </p>
@@ -112,12 +183,14 @@ function LinkPreviewCard({ url }: { url: string }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Custom ReactMarkdown link renderer
-───────────────────────────────────────────── */
+// ── Markdown link renderer ─────────────────────────────────────────────────
+
 const markdownComponents: Components = {
-  a({ href, children }) {
-    if (!href) return <span>{children}</span>;
+  a: ({ href, children }) => {
+    if (!href) {
+      return <span>{children}</span>;
+    }
+
     return (
       <span className="inline-block w-full">
         <a
@@ -128,15 +201,14 @@ const markdownComponents: Components = {
         >
           {children}
         </a>
+
         <LinkPreviewCard url={href} />
       </span>
     );
   },
 };
 
-/* ─────────────────────────────────────────────
-   Main Page
-───────────────────────────────────────────── */
+
 export default function ChatbotPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout: contextLogout } = useAuth();
@@ -153,7 +225,6 @@ export default function ChatbotPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
@@ -169,7 +240,13 @@ export default function ChatbotPage() {
       setLoading(true);
       const response = await getChatHistory();
       if (response?.history && Array.isArray(response.history)) {
-        setMessages(response.history);
+        // Pastikan history lama juga punya id
+        setMessages(
+          response.history.map((m: Omit<Message, "id">) => ({
+            ...m,
+            id: crypto.randomUUID(),
+          }))
+        );
       } else {
         setMessages([]);
       }
@@ -192,7 +269,7 @@ export default function ChatbotPage() {
 
     const newMessages: Message[] = [
       ...messages,
-      { role: "user" as const, content: userMessage, imageUrl: imagePreviewUrl },
+      { id: crypto.randomUUID(), role: "user", content: userMessage, imageUrl: imagePreviewUrl },
     ];
     setMessages(newMessages);
     setSending(true);
@@ -207,14 +284,15 @@ export default function ChatbotPage() {
       } else {
         response = await sendMessage(userMessage);
       }
-      newMessages.push({ role: "assistant" as const, content: response.response });
-      setMessages([...newMessages]);
+      setMessages([
+        ...newMessages,
+        { id: crypto.randomUUID(), role: "assistant", content: response.response },
+      ]);
     } catch (err: any) {
-      newMessages.push({
-        role: "assistant" as const,
-        content: `Error: ${err.message || "Failed to send message"}`,
-      });
-      setMessages([...newMessages]);
+      setMessages([
+        ...newMessages,
+        { id: crypto.randomUUID(), role: "assistant", content: `Error: ${err.message || "Failed to send message"}` },
+      ]);
     } finally {
       setSending(false);
       setAttachedFiles([]);
@@ -264,8 +342,6 @@ export default function ChatbotPage() {
       {/* ── NAVBAR ── */}
       <header className="border-b bg-white z-10 flex-shrink-0">
         <div className="mx-auto flex h-14 sm:h-16 max-w-full items-center justify-between px-4 sm:px-6">
-
-          {/* Left: logo + desktop nav */}
           <div className="flex items-center gap-6 sm:gap-14">
             <a href="/">
               <h1 className="text-base sm:text-xl font-bold text-[#0A2A8B] cursor-pointer whitespace-nowrap">
@@ -279,8 +355,6 @@ export default function ChatbotPage() {
               <a href="#" className="hover:text-[#0A2A8B] transition">Pricing</a>
             </nav>
           </div>
-
-          {/* Right: user + logout + mobile hamburger */}
           <div className="flex items-center gap-3">
             <span className="hidden sm:block text-sm text-gray-600 truncate max-w-[120px]">
               {user?.fullName || user?.username}
@@ -289,11 +363,8 @@ export default function ChatbotPage() {
               onClick={handleLogout}
               className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-[#0A2A8B] transition"
             >
-              <LogOut size={16} />
-              Logout
+              <LogOut size={16} /> Logout
             </button>
-
-            {/* Mobile menu button */}
             <button
               onClick={() => setMobileMenuOpen((o) => !o)}
               className="md:hidden flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition"
@@ -303,12 +374,9 @@ export default function ChatbotPage() {
           </div>
         </div>
 
-        {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white px-4 py-3 flex flex-col gap-3 text-sm">
-            <div className="text-gray-500 font-medium">
-              {user?.fullName || user?.username}
-            </div>
+            <div className="text-gray-500 font-medium">{user?.fullName || user?.username}</div>
             <a href="#" className="text-gray-700 hover:text-[#0A2A8B]">Solutions</a>
             <a href="#" className="text-gray-700 hover:text-[#0A2A8B]">Platform</a>
             <a href="#" className="text-gray-700 hover:text-[#0A2A8B]">Enterprise</a>
@@ -317,8 +385,7 @@ export default function ChatbotPage() {
               onClick={handleLogout}
               className="flex items-center gap-2 text-red-500 hover:text-red-700 transition font-medium"
             >
-              <LogOut size={15} />
-              Logout
+              <LogOut size={15} /> Logout
             </button>
           </div>
         )}
@@ -326,8 +393,6 @@ export default function ChatbotPage() {
 
       {/* ── MAIN ── */}
       <main className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Messages area */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
 
@@ -339,14 +404,12 @@ export default function ChatbotPage() {
                   <Bot size={34} className="hidden sm:block" />
                 </div>
               </div>
-
               <h1 className="text-center text-3xl sm:text-4xl lg:text-5xl font-bold text-[#0A2A8B]">
                 Hi, I'm Chatson
               </h1>
               <p className="mt-3 text-center text-base sm:text-lg text-muted-foreground">
                 Anything I can help with today?
               </p>
-
               <div className="mt-8 sm:mt-12 grid w-full max-w-xs sm:max-w-xl lg:max-w-3xl grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {suggestions.map((item) => (
                   <button
@@ -365,8 +428,8 @@ export default function ChatbotPage() {
             /* ── Chat messages ── */
             <section className="px-3 sm:px-6 py-6 sm:py-8">
               <div className="max-w-3xl mx-auto space-y-5 sm:space-y-6">
-                {messages.map((msg, idx) => (
-                  <div key={idx}>
+                {messages.map((msg) => (
+                  <div key={msg.id}>
                     {msg.role === "user" ? (
 
                       /* User bubble */
@@ -389,16 +452,22 @@ export default function ChatbotPage() {
 
                     ) : (
 
-                      /* Assistant bubble */
+                      /* ── Assistant bubble ── */
                       <div className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-shrink-0 mt-0.5 flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
                           <Bot size={13} className="sm:hidden" />
                           <Bot size={14} className="hidden sm:block" />
                         </div>
-                        <div className="flex-1 min-w-0 text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900 overflow-hidden">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                            {msg.content}
-                          </ReactMarkdown>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900 overflow-hidden">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+
+                          {/* ── FEEDBACK BUTTONS ── */}
+                          <FeedbackButtons messageId={msg.id} />
+
                         </div>
                       </div>
 
@@ -420,19 +489,15 @@ export default function ChatbotPage() {
                   </div>
                 )}
 
-                {/* Scroll anchor */}
                 <div ref={messagesEndRef} />
               </div>
             </section>
-
           )}
         </div>
 
         {/* ── INPUT AREA ── */}
         <div className="flex-shrink-0 border-t bg-white px-3 sm:px-6 py-4 sm:py-6">
           <div className="max-w-3xl mx-auto">
-
-            {/* Attached image preview */}
             {attachedFiles.length > 0 && (
               <div className="mb-2 flex gap-2 flex-wrap">
                 {attachedFiles.map((f, i) => (
@@ -453,10 +518,7 @@ export default function ChatbotPage() {
               </div>
             )}
 
-            {/* Input row */}
             <div className="flex items-center rounded-full border bg-white px-2 sm:px-3 shadow-lg gap-1">
-
-              {/* Attach button + popup */}
               <div className="relative flex-shrink-0">
                 <button
                   onClick={() => setPopupOpen((o) => !o)}
@@ -475,7 +537,6 @@ export default function ChatbotPage() {
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                       Lampirkan Gambar
                     </p>
-
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       onDragOver={(e) => e.preventDefault()}
@@ -486,7 +547,6 @@ export default function ChatbotPage() {
                       <span className="text-sm font-medium text-center">Klik atau seret gambar</span>
                       <span className="text-[11px] text-muted-foreground">PNG, JPG, GIF, WEBP</span>
                     </div>
-
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -495,7 +555,6 @@ export default function ChatbotPage() {
                       className="hidden"
                       onChange={(e) => handleFiles(e.target.files)}
                     />
-
                     {pendingFiles.length > 0 && (
                       <div className="mt-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
                         {pendingFiles.map((f, i) => (
@@ -509,7 +568,6 @@ export default function ChatbotPage() {
                         ))}
                       </div>
                     )}
-
                     <div className="mt-3 flex justify-end">
                       <button
                         onClick={attachImages}
@@ -522,7 +580,6 @@ export default function ChatbotPage() {
                 )}
               </div>
 
-              {/* Text input */}
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -532,7 +589,6 @@ export default function ChatbotPage() {
                 disabled={sending}
               />
 
-              {/* Send button */}
               <button
                 onClick={handleSubmit}
                 disabled={sending || !message.trim()}
@@ -552,4 +608,3 @@ export default function ChatbotPage() {
     </div>
   );
 }
-
