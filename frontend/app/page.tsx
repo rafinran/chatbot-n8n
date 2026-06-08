@@ -70,7 +70,17 @@ export default function HomePage() {
             <a href="#" className="hover:text-[#0A2A8B] transition">EN</a>
             <a href="#" className="hover:text-[#0A2A8B] transition">About Webson</a>
             <a href="#" className="hover:text-[#0A2A8B] transition">Accessibility</a>
-
+          
+            {isLoggedIn && user?.role === "admin" && (
+              <Button
+                variant="outline"
+                className="rounded-full px-5"
+                onClick={() => router.push("/admin")}
+              >
+                Admin
+              </Button>
+            )}
+          
             {isLoggedIn ? (
               <Button
                 variant="outline"
