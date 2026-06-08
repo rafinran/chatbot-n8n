@@ -27,6 +27,9 @@ import {
   AlertTriangle,
   Clock3,
   MessageCircle,
+  Eye,
+  Search,
+  Filter,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -401,6 +404,237 @@ function OverviewTab() {
   );
 }
 
+function EscalationTab() {
+  const tickets = [
+    {
+      id: 1,
+      user: "Aku Testing",
+      username: "@gemini",
+      question:
+        "[Gambar] Kira kira kalau ada warna begitu kenapa ya?",
+      confidence: 0.21,
+      reason: "Confidence rendah",
+      status: "Pending",
+      date: "08 Jun",
+      time: "14:32",
+      badge: "danger",
+    },
+    {
+      id: 2,
+      user: "RafIndran",
+      username: "@ranz",
+      question: "halo",
+      confidence: 0,
+      reason: "Tidak ada konteks pertanyaan",
+      status: "Pending",
+      date: "08 Jun",
+      time: "13:15",
+      badge: "manual",
+    },
+    {
+      id: 3,
+      user: "Epson",
+      username: "@admin",
+      question: "Cara reset Ink pad L3150 sudah penuh?",
+      confidence: 0.38,
+      reason: "Tidak relevan",
+      status: "Selesai",
+      date: "07 Jun",
+      time: "09:44",
+      badge: "done",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+
+      {/* KPI */}
+      <div className="grid md:grid-cols-3 gap-4">
+
+        <div className="bg-white rounded-xl border p-5">
+          <p className="text-xs text-gray-500">
+            Pending hari ini
+          </p>
+          <p className="text-4xl font-bold text-amber-500 mt-2">
+            5
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <p className="text-xs text-gray-500">
+            Selesai minggu ini
+          </p>
+          <p className="text-4xl font-bold text-green-600 mt-2">
+            23
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border p-5">
+          <p className="text-xs text-gray-500">
+            Avg waktu tangani
+          </p>
+          <p className="text-4xl font-bold text-blue-600 mt-2">
+            2.4
+          </p>
+          <p className="text-xs text-gray-400">
+            jam
+          </p>
+        </div>
+
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border overflow-hidden">
+
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b">
+
+          <div className="flex items-center gap-2">
+            <AlertTriangle
+              size={16}
+              className="text-amber-500"
+            />
+            <span className="font-semibold">
+              Tiket Eskalasi
+            </span>
+
+            <span className="px-2 py-1 text-xs rounded-full bg-gray-100">
+              28 total
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+
+            <button className="px-3 py-1.5 rounded-lg text-xs bg-amber-100 text-amber-700">
+              Pending
+            </button>
+
+            <button className="px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600">
+              7 hari
+            </button>
+
+            <div className="relative">
+              <Search
+                size={14}
+                className="absolute left-3 top-2.5 text-gray-400"
+              />
+
+              <input
+                placeholder="Cari user atau pertanyaan..."
+                className="pl-8 h-9 w-64 rounded-lg border text-sm"
+              />
+            </div>
+
+            <button className="h-9 px-3 rounded-lg border flex items-center gap-2 text-sm">
+              <RefreshCw size={14} />
+              Refresh
+            </button>
+
+          </div>
+        </div>
+
+        <table className="w-full text-sm">
+
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="text-left px-4 py-3">User</th>
+              <th className="text-left px-4 py-3">Pertanyaan</th>
+              <th className="text-left px-4 py-3">Waktu</th>
+              <th className="text-left px-4 py-3">Alasan Eskalasi</th>
+              <th className="text-left px-4 py-3">Status</th>
+              <th className="text-right px-4 py-3">Aksi</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            {tickets.map((ticket) => (
+              <tr
+                key={ticket.id}
+                className="border-b hover:bg-gray-50"
+              >
+                <td className="px-4 py-3">
+                  <div>
+                    <p className="font-medium">
+                      {ticket.user}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {ticket.username}
+                    </p>
+                  </div>
+                </td>
+
+                <td className="px-4 py-3">
+                  <p>{ticket.question}</p>
+
+                  {ticket.confidence > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Confidence RAG:
+                      {" "}
+                      {ticket.confidence}
+                    </p>
+                  )}
+                </td>
+
+                <td className="px-4 py-3 text-sm">
+                  {ticket.date}
+                  <br />
+                  {ticket.time}
+                </td>
+
+                <td className="px-4 py-3">
+
+                  {ticket.badge === "manual" && (
+                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                      Manual
+                    </span>
+                  )}
+
+                  {ticket.badge === "danger" && (
+                    <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                      Confidence rendah
+                    </span>
+                  )}
+
+                  {ticket.badge === "done" && (
+                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700">
+                      Tidak relevan
+                    </span>
+                  )}
+
+                </td>
+
+                <td className="px-4 py-3">
+
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      ticket.status === "Pending"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {ticket.status}
+                  </span>
+
+                </td>
+
+                <td className="px-4 py-3 text-right">
+
+                  <button className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg hover:bg-gray-50">
+                    <Eye size={14} />
+                    Detail
+                  </button>
+
+                </td>
+              </tr>
+            ))}
+
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -414,7 +648,7 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports">("overview");
+  const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports"> ("overview");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -594,6 +828,17 @@ export default function AdminPage() {
                 <Database size={12} className="inline mr-1" />Dokumen
               </button>
               <button
+                onClick={() => setTab("eskalasi")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                  tab === "eskalasi"
+                    ? "bg-white shadow text-[#0A2A8B]"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <AlertTriangle size={12} className="inline mr-1" />
+                Eskalasi
+              </button>
+              <button
                 onClick={() => setTab("users")}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "users" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
               >
@@ -618,6 +863,8 @@ export default function AdminPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {tab === "overview" && <OverviewTab />}
+
+        {tab === "eskalasi" && <EscalationTab />}
 
         {tab === "documents" && (
           <>
