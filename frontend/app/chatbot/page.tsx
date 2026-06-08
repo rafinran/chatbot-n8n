@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Components } from "react-markdown";
@@ -395,7 +396,7 @@ export default function ChatbotPage() {
                           <Bot size={14} className="hidden sm:block" />
                         </div>
                         <div className="flex-1 min-w-0 text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900 overflow-hidden">
-                          <ReactMarkdown components={markdownComponents}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {msg.content}
                           </ReactMarkdown>
                         </div>
@@ -551,3 +552,4 @@ export default function ChatbotPage() {
     </div>
   );
 }
+
