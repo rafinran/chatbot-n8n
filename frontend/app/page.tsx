@@ -71,7 +71,7 @@ export default function HomePage() {
             <a href="#" className="hover:text-[#0A2A8B] transition">About Webson</a>
             <a href="#" className="hover:text-[#0A2A8B] transition">Accessibility</a>
           
-            {isLoggedIn && user?.role === "admin" && (
+            {isLoggedIn && user?.role === "ADMIN" && (
               <Button
                 variant="outline"
                 className="rounded-full px-5"
