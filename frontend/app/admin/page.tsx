@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -804,11 +805,20 @@ export default function AdminPage() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-3 group"
+          >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A2A8B] text-white">
               <ShieldCheck size={15} />
             </div>
-            <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span>
-            <span className="text-gray-300">·</span>
+
+        <span className="font-bold text-[#0A2A8B] text-base tracking-tight group-hover:text-[#081f66] transition">
+          Admin Panel
+        </span>
+      </Link>
+
+      <span className="text-gray-300">·</span>
             <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
               <button
                   onClick={() => setTab("overview")}
