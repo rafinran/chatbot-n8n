@@ -40,7 +40,7 @@ export default function RegisterPage() {
     try {
       const user = await register(username, email, fullName, password);
       setUser(user);
-      router.push("/chatbot");
+      router.push("/");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {

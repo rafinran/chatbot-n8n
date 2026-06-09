@@ -1,6 +1,5 @@
 "use client";
 
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +37,7 @@ export default function LoginPage() {
     try {
       const user = await login(username, password);
       setUser(user);
-      router.push("/chatbot");
+      router.push("/");
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
