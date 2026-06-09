@@ -4,6 +4,7 @@ import path from "path";
 import { requireAuth, requireAdmin } from "../middleware/auth.ts";
 import * as adminController from "../controllers/admin.controller.ts";
 import * as adminUserController from "../controllers/adminUser.controller.ts";
+import * as overviewController from "../controllers/overview.controller.ts";
 import { ALLOWED_MIMETYPES } from "../dto/admin.dto.ts";
 import { DOCS_MAX_SIZE_MB } from "../config/env.ts";
 import { DOCS_DIR, ensureDocsDir } from "../services/admin.service.ts";
@@ -30,14 +31,26 @@ const upload = multer({
 
 const router = Router();
 
-router.post("/documents",              requireAuth, requireAdmin, upload.single("file"), adminController.uploadDocument);
-router.get("/documents",               requireAuth, requireAdmin, adminController.getDocuments);
-router.post("/documents/:id/reindex",  requireAuth, requireAdmin, adminController.reindexDocument);
-router.delete("/documents/:id",        requireAuth, requireAdmin, adminController.deleteDocument);
-router.patch("/documents/:id/status",  adminController.updateDocumentStatus);
+// ── Documents ─────────────────────────────────────────────────────────────────
+router.post("/documents",             requireAuth, requireAdmin, upload.single("file"), adminController.uploadDocument);
+router.get("/documents",              requireAuth, requireAdmin, adminController.getDocuments);
+router.post("/documents/:id/reindex", requireAuth, requireAdmin, adminController.reindexDocument);
+router.delete("/documents/:id",       requireAuth, requireAdmin, adminController.deleteDocument);
+router.patch("/documents/:id/status", adminController.updateDocumentStatus);
 
-router.get("/users",               requireAuth, requireAdmin, adminUserController.getUsers);
-router.patch("/users/:id/status",  requireAuth, requireAdmin, adminUserController.toggleUserStatus);
-router.patch("/users/:id/role",    requireAuth, requireAdmin, adminUserController.updateUserRole);
+// ── Users ─────────────────────────────────────────────────────────────────────
+router.get("/users",              requireAuth, requireAdmin, adminUserController.getUsers);
+router.patch("/users/:id/status", requireAuth, requireAdmin, adminUserController.toggleUserStatus);
+router.patch("/users/:id/role",   requireAuth, requireAdmin, adminUserController.updateUserRole);
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+router.get("/overview/stats",       requireAuth, requireAdmin, overviewController.getStats);
+router.get("/overview/chat-volume", requireAuth, requireAdmin, overviewController.getChatVolume);
+router.get("/overview/top-topics",  requireAuth, requireAdmin, overviewController.getTopTopics);
+
+// ── Escalation ────────────────────────────────────────────────────────────────
+router.get("/escalations",           requireAuth, requireAdmin, overviewController.listEscalations);
+router.get("/escalations/stats",     requireAuth, requireAdmin, overviewController.getEscalationStats);
+router.patch("/escalations/:id/resolve", requireAuth, requireAdmin, overviewController.resolveEscalation);
 
 export default router;

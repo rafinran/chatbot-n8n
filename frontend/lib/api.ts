@@ -153,3 +153,34 @@ export async function updateUserRole(id: number, role: "USER" | "ADMIN") {
     body: JSON.stringify({ role }),
   });
 }
+
+// Report endpoints
+export async function sendReport(type: "daily" | "weekly") {
+  return apiCall(`/reports/send?type=${type}`, { method: "POST" });
+}
+
+// Overview endpoints
+export async function getOverviewStats() {
+  return apiCall("/admin/overview/stats");
+}
+export async function getChatVolume() {
+  return apiCall("/admin/overview/chat-volume");
+}
+export async function getTopTopics() {
+  return apiCall("/admin/overview/top-topics");
+}
+
+// Escalation endpoints
+export async function getEscalationStats() {
+  return apiCall("/admin/escalations/stats");
+}
+export async function getEscalations(status?: string, search?: string) {
+  const params = new URLSearchParams();
+  if (status && status !== "all") params.set("status", status);
+  if (search) params.set("search", search);
+  const qs = params.toString();
+  return apiCall(`/admin/escalations${qs ? `?${qs}` : ""}`);
+}
+export async function resolveEscalation(id: number) {
+  return apiCall(`/admin/escalations/${id}/resolve`, { method: "PATCH" });
+}

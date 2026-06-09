@@ -13,16 +13,17 @@ enum Role {
 }
 
 model User {
-  id             Int           @id @default(autoincrement())
-  username       String        @unique
-  email          String        @unique
+  id             Int                @id @default(autoincrement())
+  username       String             @unique
+  email          String             @unique
   fullName       String
   hashedPassword String
-  isActive       Boolean       @default(true)
-  role           Role          @default(USER)
-  createdAt      DateTime      @default(now())
+  isActive       Boolean            @default(true)
+  role           Role               @default(USER)
+  createdAt      DateTime           @default(now())
   logs           ActivityLog[]
   documents      Document[]
+  escalations    EscalationTicket[]
 }
 
 model Document {
@@ -50,6 +51,22 @@ model ActivityLog {
   hasImage   Boolean  @default(false)
   imagePath  String?
   createdAt  DateTime @default(now())
+  escalations EscalationTicket[]
+}
+
+model EscalationTicket {
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id])
+  question      String
+  reason        String       @default("confidence_rendah")
+  confidence    Float?
+  status        String       @default("pending")
+  activityLogId Int?
+  activityLog   ActivityLog? @relation(fields: [activityLogId], references: [id])
+  resolvedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model n8n_chat_histories {

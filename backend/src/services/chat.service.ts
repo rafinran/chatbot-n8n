@@ -121,8 +121,8 @@ export async function logChatActivity(
   isAnswered: boolean,
   hasImage: boolean,
   imagePath?: string
-): Promise<void> {
-  await prisma.activityLog.create({
+): Promise<number> {
+  const log = await prisma.activityLog.create({
     data: {
       userId,
       action: hasImage ? "upload" : "chat",
@@ -132,4 +132,5 @@ export async function logChatActivity(
       ...(imagePath && { imagePath }),
     },
   });
+  return log.id;
 }

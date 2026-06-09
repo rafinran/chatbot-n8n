@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Upload,
   FileText,
@@ -41,6 +41,13 @@ import {
   getUsers,
   toggleUserStatus,
   updateUserRole,
+  sendReport,
+  getOverviewStats,
+  getChatVolume,
+  getTopTopics,
+  getEscalationStats,
+  getEscalations,
+  resolveEscalation,
 } from "@/lib/api";
 
 interface Document {
@@ -106,13 +113,8 @@ function ReportTab() {
   const handleSend = async (type: "daily" | "weekly") => {
     setSending(type);
     try {
-      const res = await fetch(`/api/reports/send?type=${type}`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal mengirim laporan.");
-      showToast(data.message, "success");
+      const data = await sendReport(type);
+      showToast(data.message || "Laporan berhasil dikirim.", "success");
       setLastSent({ type: type === "daily" ? "Harian" : "Mingguan", time: new Date().toLocaleTimeString("id-ID") });
     } catch (e: any) {
       showToast(e.message || "Gagal mengirim laporan.", "error");
@@ -239,165 +241,162 @@ function ReportTab() {
 }
 
 function OverviewTab() {
-  const stats = {
-    totalChat: 47,
-    answered: 78,
-    responseTime: 3.2,
-    pendingEscalation: 5,
+  const [stats, setStats] = useState<any>(null);
+  const [volume, setVolume] = useState<{ date: string; count: number }[]>([]);
+  const [topics, setTopics] = useState<{ label: string; total: number }[]>([]);
+  const [loadingOverview, setLoadingOverview] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState("");
+
+  const fetchOverview = async () => {
+    setLoadingOverview(true);
+    try {
+      const [s, v, t] = await Promise.all([
+        getOverviewStats(),
+        getChatVolume(),
+        getTopTopics(),
+      ]);
+      setStats(s);
+      setVolume(v.volume ?? []);
+      setTopics(t.topics ?? []);
+      setUpdatedAt(new Date().toLocaleString("id-ID"));
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingOverview(false);
+    }
   };
 
-  const topTopics = [
-    { label: "Kualitas cetak", total: 110 },
-    { label: "Masalah tinta", total: 88 },
-    { label: "Koneksi WiFi", total: 62 },
-    { label: "Update firmware", total: 47 },
-    { label: "Install driver", total: 33 },
-  ];
+  useEffect(() => { fetchOverview(); }, []);
+
+  const maxVol = Math.max(...volume.map((v) => v.count), 1);
+  const maxTopic = Math.max(...topics.map((t) => t.total), 1);
+
+  if (loadingOverview) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={28} className="animate-spin text-[#0A2A8B]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">
-            Overview
-          </h2>
-          <p className="text-sm text-gray-400">
-            Terakhir diperbarui: {new Date().toLocaleString("id-ID")}
-          </p>
+          <h2 className="text-xl font-bold text-gray-800">Overview</h2>
+          <p className="text-sm text-gray-400">Terakhir diperbarui: {updatedAt}</p>
         </div>
-
-        <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">
+        <button
+          onClick={fetchOverview}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm"
+        >
           <RefreshCw size={14} />
           Refresh
         </button>
       </div>
 
       {/* KPI */}
-
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <MessageCircle size={14} />
-            Total Chat Hari Ini
+            <MessageCircle size={14} /> Total Chat Hari Ini
           </div>
-
-          <div className="text-4xl font-bold text-blue-600 mt-2">
-            {stats.totalChat}
-          </div>
+          <div className="text-4xl font-bold text-blue-600 mt-2">{stats?.totalChat ?? 0}</div>
         </div>
-
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <CheckCircle size={14} />
-            Chat Terjawab
+            <CheckCircle size={14} /> Chat Terjawab
           </div>
-
-          <div className="text-4xl font-bold text-green-600 mt-2">
-            {stats.answered}%
-          </div>
+          <div className="text-4xl font-bold text-green-600 mt-2">{stats?.answerRate ?? 0}%</div>
         </div>
-
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <Clock3 size={14} />
-            Avg Response
+            <AlertTriangle size={14} /> Eskalasi Pending
           </div>
-
-          <div className="text-4xl font-bold text-amber-600 mt-2">
-            {stats.responseTime}s
-          </div>
+          <div className="text-4xl font-bold text-red-500 mt-2">{stats?.pendingEscalation ?? 0}</div>
         </div>
-
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <AlertTriangle size={14} />
-            Eskalasi Pending
+            <Database size={14} /> Dokumen Gagal
           </div>
-
-          <div className="text-4xl font-bold text-red-500 mt-2">
-            {stats.pendingEscalation}
-          </div>
+          <div className="text-4xl font-bold text-amber-600 mt-2">{stats?.failedDocs ?? 0}</div>
         </div>
       </div>
 
-      {/* Chart Dummy */}
-
+      {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
+        {/* Volume bar chart */}
         <div className="bg-white rounded-xl border p-5">
-          <h3 className="font-semibold mb-4">
-            Volume Chat 7 Hari Terakhir
-          </h3>
-
-          <div className="h-64 flex items-end gap-3">
-            {[28, 34, 18, 41, 33, 44, 47].map((v, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-blue-500 rounded-t"
-                style={{ height: `${v * 4}px` }}
-              />
-            ))}
-          </div>
+          <h3 className="font-semibold mb-4">Volume Chat 7 Hari Terakhir</h3>
+          {volume.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-16">Belum ada data</p>
+          ) : (
+            <div className="h-48 flex items-end gap-2">
+              {volume.map((v, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-gray-400">{v.count}</span>
+                  <div
+                    className="w-full bg-blue-500 rounded-t transition-all"
+                    style={{ height: `${Math.max((v.count / maxVol) * 160, v.count > 0 ? 4 : 0)}px` }}
+                  />
+                  <span className="text-[9px] text-gray-400 truncate w-full text-center">{v.date}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Top topics */}
         <div className="bg-white rounded-xl border p-5">
-          <h3 className="font-semibold mb-4">
-            Top 5 Topik Pertanyaan
-          </h3>
-
-          <div className="space-y-4">
-            {topTopics.map((topic) => (
-              <div key={topic.label}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>{topic.label}</span>
-                  <span>{topic.total}</span>
+          <h3 className="font-semibold mb-4">Top 5 Topik Pertanyaan</h3>
+          {topics.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-16">Belum ada data</p>
+          ) : (
+            <div className="space-y-3">
+              {topics.map((topic) => (
+                <div key={topic.label}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>{topic.label}</span>
+                    <span className="font-medium">{topic.total}</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 rounded-full transition-all"
+                      style={{ width: `${(topic.total / maxTopic) * 100}%` }}
+                    />
+                  </div>
                 </div>
-
-                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500"
-                    style={{
-                      width: `${topic.total / 1.1}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Action Items */}
-
-      <div className="grid md:grid-cols-3 gap-4">
+      {/* Action items */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <h3 className="font-semibold text-yellow-700">
-            5 Tiket Eskalasi Pending
+            {stats?.pendingEscalation ?? 0} Tiket Eskalasi Pending
           </h3>
-
           <p className="text-sm text-yellow-600 mt-2">
-            Belum ada agen yang menangani tiket hari ini.
+            {stats?.pendingEscalation > 0 ? "Cek tab Eskalasi untuk detail." : "Tidak ada eskalasi pending."}
           </p>
         </div>
-
         <div className="bg-red-50 border border-red-200 rounded-xl p-5">
           <h3 className="font-semibold text-red-700">
-            3 Dokumen Gagal Diindeks
+            {stats?.failedDocs ?? 0} Dokumen Gagal Diindeks
           </h3>
-
           <p className="text-sm text-red-600 mt-2">
-            Perlu dilakukan re-indexing.
+            {stats?.failedDocs > 0 ? "Perlu dilakukan re-indexing." : "Semua dokumen terindeks."}
           </p>
         </div>
-
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
           <h3 className="font-semibold text-blue-700">
-            8 FAQ Gap Baru
+            {stats?.answerRate ?? 0}% Chat Terjawab
           </h3>
-
           <p className="text-sm text-blue-600 mt-2">
-            Belum ada jawaban di knowledge base.
+            {(stats?.answerRate ?? 0) >= 80 ? "Tingkat jawaban bagus!" : "Pertimbangkan tambah dokumen FAQ."}
           </p>
         </div>
       </div>
@@ -406,231 +405,184 @@ function OverviewTab() {
 }
 
 function EscalationTab() {
-  const tickets = [
-    {
-      id: 1,
-      user: "Aku Testing",
-      username: "@gemini",
-      question:
-        "[Gambar] Kira kira kalau ada warna begitu kenapa ya?",
-      confidence: 0.21,
-      reason: "Confidence rendah",
-      status: "Pending",
-      date: "08 Jun",
-      time: "14:32",
-      badge: "danger",
-    },
-    {
-      id: 2,
-      user: "RafIndran",
-      username: "@ranz",
-      question: "halo",
-      confidence: 0,
-      reason: "Tidak ada konteks pertanyaan",
-      status: "Pending",
-      date: "08 Jun",
-      time: "13:15",
-      badge: "manual",
-    },
-    {
-      id: 3,
-      user: "Epson",
-      username: "@admin",
-      question: "Cara reset Ink pad L3150 sudah penuh?",
-      confidence: 0.38,
-      reason: "Tidak relevan",
-      status: "Selesai",
-      date: "07 Jun",
-      time: "09:44",
-      badge: "done",
-    },
-  ];
+  const [tickets, setTickets]   = useState<any[]>([]);
+  const [escStats, setEscStats] = useState<any>(null);
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [search, setSearch]     = useState("");
+  const [loadingEsc, setLoadingEsc] = useState(true);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+
+  const reasonLabel: Record<string, { label: string; cls: string }> = {
+    low_confidence: { label: "Confidence rendah", cls: "bg-red-100 text-red-700" },
+    no_answer:      { label: "Tidak terjawab",    cls: "bg-amber-100 text-amber-700" },
+    no_context:     { label: "Tidak ada konteks", cls: "bg-blue-100 text-blue-700" },
+    manual:         { label: "Manual",             cls: "bg-gray-100 text-gray-700" },
+  };
+
+  const fetchEscalations = async () => {
+    setLoadingEsc(true);
+    try {
+      const [t, s] = await Promise.all([
+        getEscalations(statusFilter, search),
+        getEscalationStats(),
+      ]);
+      setTickets(t.tickets ?? []);
+      setEscStats(s);
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingEsc(false);
+    }
+  };
+
+  useEffect(() => { fetchEscalations(); }, [statusFilter]);
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") fetchEscalations();
+  };
+
+  const handleResolve = async (id: number) => {
+    setResolvingId(id);
+    try {
+      await resolveEscalation(id);
+      await fetchEscalations();
+    } catch {
+      // silently ignore
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
-
       {/* KPI */}
-      <div className="grid md:grid-cols-3 gap-4">
-
+      <div className="grid sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-5">
-          <p className="text-xs text-gray-500">
-            Pending hari ini
-          </p>
-          <p className="text-4xl font-bold text-amber-500 mt-2">
-            5
-          </p>
+          <p className="text-xs text-gray-500">Pending hari ini</p>
+          <p className="text-4xl font-bold text-amber-500 mt-2">{escStats?.pendingToday ?? 0}</p>
         </div>
-
         <div className="bg-white rounded-xl border p-5">
-          <p className="text-xs text-gray-500">
-            Selesai minggu ini
-          </p>
-          <p className="text-4xl font-bold text-green-600 mt-2">
-            23
-          </p>
+          <p className="text-xs text-gray-500">Selesai minggu ini</p>
+          <p className="text-4xl font-bold text-green-600 mt-2">{escStats?.resolvedWeek ?? 0}</p>
         </div>
-
-        <div className="bg-white rounded-xl border p-5">
-          <p className="text-xs text-gray-500">
-            Avg waktu tangani
-          </p>
-          <p className="text-4xl font-bold text-blue-600 mt-2">
-            2.4
-          </p>
-          <p className="text-xs text-gray-400">
-            jam
-          </p>
-        </div>
-
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
-
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b">
-
           <div className="flex items-center gap-2">
-            <AlertTriangle
-              size={16}
-              className="text-amber-500"
-            />
-            <span className="font-semibold">
-              Tiket Eskalasi
-            </span>
-
-            <span className="px-2 py-1 text-xs rounded-full bg-gray-100">
-              28 total
-            </span>
+            <AlertTriangle size={16} className="text-amber-500" />
+            <span className="font-semibold">Tiket Eskalasi</span>
+            <span className="px-2 py-1 text-xs rounded-full bg-gray-100">{tickets.length} tiket</span>
           </div>
-
-          <div className="flex items-center gap-2">
-
-            <button className="px-3 py-1.5 rounded-lg text-xs bg-amber-100 text-amber-700">
-              Pending
-            </button>
-
-            <button className="px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600">
-              7 hari
-            </button>
-
+          <div className="flex flex-wrap items-center gap-2">
+            {["pending", "resolved", "all"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs capitalize transition ${
+                  statusFilter === s
+                    ? "bg-[#0A2A8B] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {s === "all" ? "Semua" : s === "pending" ? "Pending" : "Selesai"}
+              </button>
+            ))}
             <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-2.5 text-gray-400"
-              />
-
+              <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
               <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleSearch}
                 placeholder="Cari user atau pertanyaan..."
-                className="pl-8 h-9 w-64 rounded-lg border text-sm"
+                className="pl-8 h-9 w-52 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
               />
             </div>
-
-            <button className="h-9 px-3 rounded-lg border flex items-center gap-2 text-sm">
+            <button
+              onClick={fetchEscalations}
+              className="h-9 px-3 rounded-lg border flex items-center gap-2 text-sm hover:bg-gray-50"
+            >
               <RefreshCw size={14} />
-              Refresh
             </button>
-
           </div>
         </div>
 
-        <table className="w-full text-sm">
-
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left px-4 py-3">User</th>
-              <th className="text-left px-4 py-3">Pertanyaan</th>
-              <th className="text-left px-4 py-3">Waktu</th>
-              <th className="text-left px-4 py-3">Alasan Eskalasi</th>
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-right px-4 py-3">Aksi</th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {tickets.map((ticket) => (
-              <tr
-                key={ticket.id}
-                className="border-b hover:bg-gray-50"
-              >
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="font-medium">
-                      {ticket.user}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {ticket.username}
-                    </p>
-                  </div>
-                </td>
-
-                <td className="px-4 py-3">
-                  <p>{ticket.question}</p>
-
-                  {ticket.confidence > 0 && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Confidence RAG:
-                      {" "}
-                      {ticket.confidence}
-                    </p>
-                  )}
-                </td>
-
-                <td className="px-4 py-3 text-sm">
-                  {ticket.date}
-                  <br />
-                  {ticket.time}
-                </td>
-
-                <td className="px-4 py-3">
-
-                  {ticket.badge === "manual" && (
-                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
-                      Manual
-                    </span>
-                  )}
-
-                  {ticket.badge === "danger" && (
-                    <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
-                      Confidence rendah
-                    </span>
-                  )}
-
-                  {ticket.badge === "done" && (
-                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700">
-                      Tidak relevan
-                    </span>
-                  )}
-
-                </td>
-
-                <td className="px-4 py-3">
-
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      ticket.status === "Pending"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {ticket.status}
-                  </span>
-
-                </td>
-
-                <td className="px-4 py-3 text-right">
-
-                  <button className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg hover:bg-gray-50">
-                    <Eye size={14} />
-                    Detail
-                  </button>
-
-                </td>
-              </tr>
-            ))}
-
-          </tbody>
-        </table>
+        {loadingEsc ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-[#0A2A8B]" />
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className="py-16 text-center text-sm text-gray-400">Tidak ada tiket ditemukan.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">User</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Pertanyaan</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Waktu</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Alasan</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((ticket) => {
+                  const r = reasonLabel[ticket.reason] ?? { label: ticket.reason, cls: "bg-gray-100 text-gray-700" };
+                  return (
+                    <tr key={ticket.id} className="border-b hover:bg-gray-50 transition">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-xs">{ticket.user}</p>
+                        <p className="text-[11px] text-gray-400">{ticket.username}</p>
+                      </td>
+                      <td className="px-4 py-3 max-w-[200px]">
+                        <p className="truncate text-xs">{ticket.hasImage ? `[Gambar] ` : ""}{ticket.question}</p>
+                        {ticket.confidence != null && ticket.confidence > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            Confidence: {Number(ticket.confidence).toFixed(2)}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {ticket.date}<br />{ticket.time}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${r.cls}`}>
+                          {r.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          ticket.status === "pending"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-green-100 text-green-700"
+                        }`}>
+                          {ticket.status === "pending" ? "Pending" : "Selesai"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {ticket.status === "pending" && (
+                          <button
+                            onClick={() => handleResolve(ticket.id)}
+                            disabled={resolvingId === ticket.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg hover:bg-gray-50 text-xs disabled:opacity-40 transition"
+                          >
+                            {resolvingId === ticket.id
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : <CheckCircle size={12} />
+                            }
+                            Selesai
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -689,10 +641,14 @@ export default function AdminPage() {
 
   useEffect(() => {
     const hasProcessing = docs.some((d) => d.status === "processing");
-    if (hasProcessing) {
-      pollRef.current = setTimeout(fetchDocs, 4000);
-    }
-    return () => { if (pollRef.current) clearTimeout(pollRef.current); };
+    
+    if (!hasProcessing) return;
+
+    const interval = setInterval(async () => {
+      await fetchDocs();
+    }, 3000); 
+
+    return () => clearInterval(interval);
   }, [docs, fetchDocs]);
 
   const handleUpload = async (files: FileList | null) => {
@@ -812,6 +768,8 @@ export default function AdminPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A2A8B] text-white">
               <ShieldCheck size={15} />
             </div>
+            {/* <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span> */}
+            {/* <span className="text-gray-300">·</span>  */}
 
         <span className="font-bold text-[#0A2A8B] text-base tracking-tight group-hover:text-[#081f66] transition">
           Admin Panel
