@@ -21,52 +21,62 @@ model User {
   isActive       Boolean            @default(true)
   role           Role               @default(USER)
   createdAt      DateTime           @default(now())
-  logs           ActivityLog[]
+  activityLogs   ActivityLog[]
+  chatLogs       ChatLog[]
   documents      Document[]
   escalations    EscalationTicket[]
 }
 
 model Document {
-  id           Int      @id @default(autoincrement())
-  filename     String
-  originalName String
-  mimeType     String
-  sizeBytes    Int
-  status       String   @default("processing") // processing | indexed | failed
-  errorMessage String?
-  collectionName String @default("knowledge_base")
-  uploadedById Int
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  filename       String
+  originalName   String
+  mimeType       String
+  sizeBytes      Int
+  status         String   @default("processing") // processing | indexed | failed
+  errorMessage   String?
+  collectionName String   @default("knowledge_base")
+  uploadedById   Int
+  uploadedBy     User     @relation(fields: [uploadedById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
+// Audit trail murni: login, logout, dsb.
 model ActivityLog {
-  id         Int      @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // login | logout
+  createdAt DateTime @default(now())
+}
+
+// Log khusus aktivitas chat
+model ChatLog {
+  id         Int               @id @default(autoincrement())
   userId     Int
-  user       User     @relation(fields: [userId], references: [id])
-  action     String
+  user       User              @relation(fields: [userId], references: [id])
   question   String?
   isAnswered Boolean?
-  hasImage   Boolean  @default(false)
+  hasImage   Boolean           @default(false)
   imagePath  String?
-  createdAt  DateTime @default(now())
-  escalations EscalationTicket[]
+  createdAt  DateTime          @default(now())
+  escalation EscalationTicket?
 }
 
 model EscalationTicket {
-  id            Int          @id @default(autoincrement())
-  userId        Int
-  user          User         @relation(fields: [userId], references: [id])
-  question      String
-  reason        String       @default("confidence_rendah")
-  confidence    Float?
-  status        String       @default("pending")
-  activityLogId Int?
-  activityLog   ActivityLog? @relation(fields: [activityLogId], references: [id])
-  resolvedAt    DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id])
+  question   String
+  reason     String    @default("confidence_rendah")
+  confidence Float?
+  status     String    @default("pending")
+  chatLogId  Int?      @unique
+  chatLog    ChatLog?  @relation(fields: [chatLogId], references: [id])
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model n8n_chat_histories {

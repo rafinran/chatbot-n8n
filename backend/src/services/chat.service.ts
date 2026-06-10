@@ -1,4 +1,3 @@
-
 import fs from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from "../db.ts";
@@ -58,20 +57,21 @@ export async function clearSession(userId: number): Promise<void> {
 }
 
 // ── Image analysis ────────────────────────────────────────────────────────────
+
 export async function analyzeImage(file: Express.Multer.File, message: string): Promise<string> {
   const base64 = fs.readFileSync(file.path).toString("base64");
   const promptText = `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`;
 
   // Coba Gemini Cloud dulu
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
     const result = await model.generateContent([
       promptText,
       { inlineData: { mimeType: file.mimetype, data: base64 } },
     ]);
     return result.response.text();
   } catch (err) {
-    console.error("[CHAT] Gemini error: ", err)
+    console.error("[CHAT] Gemini error: ", err);
     console.warn("[CHAT] Fallback ke openRouter...");
   }
 
@@ -101,6 +101,29 @@ export async function analyzeImage(file: Express.Multer.File, message: string): 
   return orData.choices?.[0]?.message?.content ?? "";
 }
 
+// ── Answer status resolution ──────────────────────────────────────────────────
+//
+// n8n hanya set is_answered=false kalau workflow error. Kasus "tidak ada di
+// knowledge base" atau "butuh klarifikasi" tetap lolos sebagai is_answered=true
+// karena AI Agent sukses jalan. Fungsi ini mendeteksi pola jawaban LLM dan
+// meng-override status sesuai kondisi sebenarnya.
+
+const UNANSWERED_PATTERNS: RegExp[] = [
+  /tidak memiliki informasi mengenai/i,
+  /saya tidak memiliki informasi/i,
+  /silakan hubungi customer service epson/i,
+  /tidak dapat menemukan informasi/i,
+  /tidak ada informasi.*tersebut/i,
+  /di luar cakupan/i,
+  /tidak tersedia dalam knowledge base/i,
+];
+
+export function resolveIsAnswered(answer: string, n8nIsAnswered: boolean): boolean {
+  if (!n8nIsAnswered) return false;
+  if (UNANSWERED_PATTERNS.some((p) => p.test(answer))) return false;
+  return true;
+}
+
 // ── n8n call ──────────────────────────────────────────────────────────────────
 
 export async function callN8n(question: string, userId: number, userEmail: string): Promise<N8nResponseDto> {
@@ -113,19 +136,26 @@ export async function callN8n(question: string, userId: number, userEmail: strin
   return res.json() as Promise<N8nResponseDto>;
 }
 
-// ── Activity log ──────────────────────────────────────────────────────────────
+// ── Activity log (audit trail: login/logout) ──────────────────────────────────
 
-export async function logChatActivity(
+export async function logActivity(userId: number, action: string): Promise<void> {
+  await prisma.activityLog.create({
+    data: { userId, action },
+  });
+}
+
+// ── Chat log ──────────────────────────────────────────────────────────────────
+
+export async function logChat(
   userId: number,
   message: string,
   isAnswered: boolean,
   hasImage: boolean,
   imagePath?: string
 ): Promise<number> {
-  const log = await prisma.activityLog.create({
+  const log = await prisma.chatLog.create({
     data: {
       userId,
-      action: hasImage ? "upload" : "chat",
       question: message.slice(0, 500),
       isAnswered,
       hasImage,

@@ -4,7 +4,6 @@ import * as chatService from "../services/chat.service.ts";
 import { maybeEscalate } from "../services/overview.service.ts";
 import { SendMessageSchema } from "../dto/chat.dto.ts";
 import { asyncHandler } from "../utils/asyncHandler.ts";
-import prisma from "../db.ts";
 
 export const sendMessage = asyncHandler(async (req: Request, res: Response): Promise<any> => {
   const parsed = SendMessageSchema.safeParse(req.body);
@@ -27,39 +26,35 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
     const n8nData = await chatService.callN8n(question, req.user.id, req.user.email);
     console.log("[CHAT] Response n8n:", n8nData);
 
+    // Resolve status jawaban sebenarnya — n8n hanya false kalau workflow error,
+    // tapi jawaban "tidak ada di KB" tetap lolos. Deteksi via pattern.
+    const isAnswered = chatService.resolveIsAnswered(n8nData.answer, n8nData.is_answered);
+    console.log("[CHAT] is_answered (resolved):", isAnswered, "| raw:", n8nData.is_answered);
+
     const userContent = req.file ? `[Gambar] ${message}` : message;
     await chatService.appendSession(req.user.id, userContent, n8nData.answer);
 
-    // Log aktivitas
-    await chatService.logChatActivity(
+    // Log ke ChatLog (bukan ActivityLog)
+    const chatLogId = await chatService.logChat(
       req.user.id,
       message,
-      n8nData.is_answered,
+      isAnswered,
       !!req.file,
       req.file?.filename,
     );
 
-    // Auto-escalate kalau tidak terjawab atau confidence rendah
-    // Ambil log yang baru saja dibuat
-    const latestLog = await prisma.activityLog.findFirst({
-      where: { userId: req.user.id },
-      orderBy: { id: "desc" },
+    // Auto-escalate kalau tidak terjawab
+    await maybeEscalate({
+      chatLogId,
+      userId:     req.user.id,
+      isAnswered,
+      confidence: (n8nData as any).confidence,
+      question:   message,
+    }).catch((err) => {
+      console.warn("[CHAT] maybeEscalate error:", err.message);
     });
 
-    if (latestLog) {
-      await maybeEscalate({
-        logId:      latestLog.id,
-        userId:     req.user.id,
-        isAnswered: n8nData.is_answered,
-        confidence: (n8nData as any).confidence,
-        question:   message,
-      }).catch((err) => {
-        // Jangan sampai error escalation gagalkan response chat
-        console.warn("[CHAT] maybeEscalate error:", err.message);
-      });
-    }
-
-    res.json({ response: n8nData.answer, is_answered: n8nData.is_answered });
+    res.json({ response: n8nData.answer, is_answered: isAnswered });
   } finally {
     if (req.file?.path) {
       fs.unlink(req.file.path, (err) => {
