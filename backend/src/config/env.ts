@@ -14,8 +14,7 @@ export const env = {
   indexerUrl:     process.env.INDEXER_URL || "http://indexer:5000",
   indexerSecret:  required("INDEXER_SECRET"),
   databaseUrl:    required("DATABASE_URL"),
-  gmailUser:        required("GMAIL_USER"),
-  gmailAppPassword: required("GMAIL_APP_PASSWORD"),
+  resendApiKey:     required("RESEND_API_KEY"),
   reportRecipient:  required("REPORT_RECIPIENT"),
   openRouterApiKey: process.env.OPENROUTER_API_KEY,
 } as const;

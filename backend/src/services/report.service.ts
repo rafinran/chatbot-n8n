@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import prisma from "../db.ts";
 import { env } from "../config/env.ts";
 
@@ -234,17 +235,31 @@ function buildEmailHtml(params: {
 // ── Step 4: Send Email via Gmail SMTP ─────────────────────────────────────
 
 async function sendEmail(subject: string, html: string): Promise<void> {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: env.gmailUser, pass: env.gmailAppPassword },
-  });
+  // const transporter = nodemailer.createTransport({
+  //   service: "gmail",
+  //   auth: { user: env.gmailUser, pass: env.gmailAppPassword },
+  // });
+  //
+  // await transporter.sendMail({
+  //   from: `"Epson Helpdesk AI" <${env.gmailUser}>`,
+  //   to: env.reportRecipient,
+  //   subject,
+  //   html,
+  // });
+  //
+  const resend = new Resend(env.resendApiKey);
 
-  await transporter.sendMail({
-    from: `"Epson Helpdesk AI" <${env.gmailUser}>`,
+  const error = await resend.emails.send({
+    from: "Epson Helpdesk AI <helpdesk@chatson.my.id>",
     to: env.reportRecipient,
     subject,
     html,
   });
+
+  if (error) {
+    console.warn("[REPORT] Resend email error:", error);
+    throw new Error("Gagal mengirim email laporan.");
+  }
 }
 
 // ── Main: Generate & Send Report ──────────────────────────────────────────
