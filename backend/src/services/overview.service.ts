@@ -14,6 +14,7 @@ export interface EscalationTicketData {
   id: number;
   user: string;
   username: string;
+  email: string; 
   question: string;
   hasImage: boolean;
   confidence: number | null;
@@ -159,14 +160,14 @@ export async function getEscalationTickets(
         ? {
             OR: [
               { user: { fullName: { contains: search, mode: "insensitive" } } },
-              { user: { username: { contains: search, mode: "insensitive" } } },
+              { user: { email: { contains: search, mode: "insensitive" } } },
               { question: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),
     },
     include: {
-      user: { select: { username: true, fullName: true } },
+      user: { select: { username: true, email: true, fullName: true } },
       chatLog: { select: { question: true, hasImage: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -177,6 +178,7 @@ export async function getEscalationTickets(
     id:         t.id,
     user:       t.user.fullName,
     username:   `@${t.user.username}`,
+    email:      t.user.email,
     question:   t.chatLog?.question ?? t.question ?? "-",
     hasImage:   t.chatLog?.hasImage ?? false,
     confidence: t.confidence ?? null,

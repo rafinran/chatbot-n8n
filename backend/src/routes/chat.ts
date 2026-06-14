@@ -35,8 +35,17 @@ const upload = multer({
 
 const router = Router();
 
+// Chat messaging
 router.post("/",        requireAuth, upload.single("image"), chatController.sendMessage);
 router.get("/history",  requireAuth, chatController.getHistory);
+
+// Conversation management
+router.get("/conversations",           requireAuth, chatController.listConversations);
+router.post("/conversations",          requireAuth, chatController.createConversation);
+router.delete("/conversations/:id",    requireAuth, chatController.deleteConversation);
+router.patch("/conversations/:id",     requireAuth, chatController.updateConversationTitle);
+
+// Deprecated: clearHistory for backward compatibility (now deletes active conversation)
 router.delete("/history", requireAuth, chatController.clearHistory);
 
 export default router;

@@ -28,6 +28,7 @@ export async function createDocument(file: Express.Multer.File, uploadedById: nu
   fs.mkdirSync(triggerDir);
   const destPath = path.join(triggerDir, file.filename);
   fs.copyFileSync(file.path, destPath);
+  fs.writeFileSync(path.join(triggerDir, "meta.txt"), file.originalname);
 
   const storagePath = path.join(STORAGE_DIR, `${doc.id}_${file.originalname}`);
   fs.copyFileSync(file.path, storagePath);
@@ -85,5 +86,7 @@ export async function reindexDocument(id: number, uploadedById: number) {
 
   const destPath = path.join(triggerDir, doc.originalName);
   fs.copyFileSync(sourcePath, destPath);
+  fs.writeFileSync(path.join(triggerDir, "meta.txt"), doc.originalName);
   return doc;
 }
+

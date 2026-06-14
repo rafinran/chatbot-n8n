@@ -25,6 +25,7 @@ model User {
   chatLogs       ChatLog[]
   documents      Document[]
   escalations    EscalationTicket[]
+  conversations  Conversation[]
 }
 
 model Document {
@@ -79,10 +80,23 @@ model EscalationTicket {
   updatedAt  DateTime  @updatedAt
 }
 
+model Conversation {
+  id              Int                @id @default(autoincrement())
+  userId          Int
+  title           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatHistories   n8n_chat_histories[]
+
+  @@index([userId])
+}
+
 model n8n_chat_histories {
-  id         Int    @id @default(autoincrement())
-  session_id String @db.VarChar(255)
-  message    Json
+  id              Int    @id @default(autoincrement())
+  conversationId  Int
+  message         Json
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@map("n8n_chat_histories")
 }

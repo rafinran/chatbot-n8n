@@ -31,6 +31,7 @@ services:
       NODE_ENV:           ${NODE_ENV}
       INDEXER_URL:        ${INDEXER_URL}
       INDEXER_SECRET:     ${INDEXER_SECRET}
+      RESEND_API_KEY:     ${RESEND_API_KEY}
       GMAIL_USER:         ${GMAIL_USER}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       REPORT_RECIPIENT:   ${REPORT_RECIPIENT}
@@ -132,4 +133,3 @@ volumes:
   postgres_data:
   docs_inbox:
   documents_storage:
-EOF

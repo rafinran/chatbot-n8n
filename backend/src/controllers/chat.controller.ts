@@ -12,6 +12,12 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
   }
 
   const message = parsed.data.message;
+  let conversationId = parsed.data.conversationId;
+
+  // Get or create conversation if not provided
+  if (!conversationId) {
+    conversationId = await chatService.getOrCreateConversation(req.user.id);
+  }
 
   try {
     let question = message;
@@ -26,13 +32,11 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
     const n8nData = await chatService.callN8n(question, req.user.id, req.user.email);
     console.log("[CHAT] Response n8n:", n8nData);
 
-    // Resolve status jawaban sebenarnya — n8n hanya false kalau workflow error,
-    // tapi jawaban "tidak ada di KB" tetap lolos. Deteksi via pattern.
     const isAnswered = chatService.resolveIsAnswered(n8nData.answer, n8nData.is_answered);
     console.log("[CHAT] is_answered (resolved):", isAnswered, "| raw:", n8nData.is_answered);
 
     const userContent = req.file ? `[Gambar] ${message}` : message;
-    await chatService.appendSession(req.user.id, userContent, n8nData.answer);
+    await chatService.appendSession(conversationId, userContent, n8nData.answer);
 
     // Log ke ChatLog (bukan ActivityLog)
     const chatLogId = await chatService.logChat(
@@ -54,7 +58,7 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
       console.warn("[CHAT] maybeEscalate error:", err.message);
     });
 
-    res.json({ response: n8nData.answer, is_answered: isAnswered });
+    res.json({ response: n8nData.answer, is_answered: isAnswered, conversationId });
   } finally {
     if (req.file?.path) {
       fs.unlink(req.file.path, (err) => {
@@ -65,11 +69,43 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
 });
 
 export const getHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const history = await chatService.getSession(req.user.id);
-  res.json({ history });
+  const conversationIdStr = (req.query.conversationId as string) || "";
+  const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) : 
+    await chatService.getOrCreateConversation(req.user.id);
+  const history = await chatService.getSession(conversationId);
+  res.json({ history, conversationId });
 });
 
 export const clearHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  await chatService.clearSession(req.user.id);
-  res.json({ message: "Percakapan direset." });
+  const conversationIdStr = (req.query.conversationId as string) || "";
+  const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) :
+    await chatService.getOrCreateConversation(req.user.id);
+  await chatService.deleteConversation(conversationId);
+  res.json({ message: "Conversation dihapus." });
+});
+
+export const listConversations = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const conversations = await chatService.listConversations(req.user.id);
+  res.json({ conversations });
+});
+
+export const createConversation = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { title } = req.body;
+  const conversation = await chatService.createConversation(req.user.id, title);
+  res.status(201).json({ conversation });
+});
+
+export const deleteConversation = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const idStr = typeof req.params.id === "string" ? req.params.id : "";
+  const conversationId = parseInt(idStr, 10);
+  await chatService.deleteConversation(conversationId);
+  res.json({ message: "Conversation dihapus." });
+});
+
+export const updateConversationTitle = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const idStr = typeof req.params.id === "string" ? req.params.id : "";
+  const conversationId = parseInt(idStr, 10);
+  const { title } = req.body;
+  await chatService.updateConversationTitle(conversationId, title);
+  res.json({ message: "Title diupdate." });
 });

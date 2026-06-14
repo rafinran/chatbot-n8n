@@ -6,15 +6,59 @@ import type { ChatMessage, N8nResponseDto } from "../dto/chat.dto.ts";
 
 const genAI = new GoogleGenerativeAI(env.googleApiKey);
 
-// ── Session helpers ───────────────────────────────────────────────────────────
+// ── Conversation helpers ──────────────────────────────────────────────────────
 
-export function sessionId(userId: number): string {
-  return `user_${userId}`;
+export async function getOrCreateConversation(userId: number): Promise<number> {
+  // Return conversation aktif (paling recent), atau buat baru jika tidak ada
+  let conversation = await prisma.conversation.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { userId, title: "New conversation" },
+    });
+  }
+
+  return conversation.id;
 }
 
-export async function getSession(userId: number): Promise<ChatMessage[]> {
+export async function createConversation(
+  userId: number,
+  title?: string
+): Promise<{ id: number; title: string | null }> {
+  const conversation = await prisma.conversation.create({
+    data: { userId, title: title || "New conversation" },
+  });
+  return { id: conversation.id, title: conversation.title };
+}
+
+export async function listConversations(userId: number): Promise<any[]> {
+  const conversations = await prisma.conversation.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, title: true, createdAt: true, updatedAt: true },
+  });
+  return conversations;
+}
+
+export async function deleteConversation(conversationId: number): Promise<void> {
+  await prisma.conversation.delete({ where: { id: conversationId } });
+}
+
+export async function updateConversationTitle(
+  conversationId: number,
+  title: string
+): Promise<void> {
+  await prisma.conversation.update({ where: { id: conversationId }, data: { title } });
+}
+
+// ── Session helpers ──────────────────────────────────────────────────────────
+
+export async function getSession(conversationId: number): Promise<ChatMessage[]> {
   const rows = await prisma.n8n_chat_histories.findMany({
-    where: { session_id: sessionId(userId) },
+    where: { conversationId },
     orderBy: { id: "asc" },
   });
 
@@ -27,22 +71,34 @@ export async function getSession(userId: number): Promise<ChatMessage[]> {
 }
 
 export async function appendSession(
-  userId: number,
+  conversationId: number,
   userContent: string,
   assistantContent: string
 ): Promise<void> {
-  const sid = sessionId(userId);
-
   await prisma.n8n_chat_histories.createMany({
     data: [
-      { session_id: sid, message: { type: "human", data: { type: "human", content: userContent } } },
-      { session_id: sid, message: { type: "ai",    data: { type: "ai",    content: assistantContent } } },
+      { conversationId, message: { type: "human", data: { type: "human", content: userContent } } },
+      { conversationId, message: { type: "ai", data: { type: "ai", content: assistantContent } } },
     ],
   });
 
+  // Update conversation timestamp & auto-generate title from first message if not set
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+  });
+
+  if (conversation) {
+    const updates: any = { updatedAt: new Date() };
+    if (!conversation.title || conversation.title === "New conversation") {
+      // Generate title dari first 50 chars of user content
+      updates.title = userContent.slice(0, 50);
+    }
+    await prisma.conversation.update({ where: { id: conversationId }, data: updates });
+  }
+
   // Trim ke SESSION_MAX_ROWS
   const allRows = await prisma.n8n_chat_histories.findMany({
-    where: { session_id: sid },
+    where: { conversationId },
     orderBy: { id: "asc" },
     select: { id: true },
   });
@@ -50,10 +106,6 @@ export async function appendSession(
     const toDelete = allRows.slice(0, allRows.length - SESSION_MAX_ROWS).map((r) => r.id);
     await prisma.n8n_chat_histories.deleteMany({ where: { id: { in: toDelete } } });
   }
-}
-
-export async function clearSession(userId: number): Promise<void> {
-  await prisma.n8n_chat_histories.deleteMany({ where: { session_id: sessionId(userId) } });
 }
 
 // ── Image analysis ────────────────────────────────────────────────────────────
@@ -102,11 +154,6 @@ export async function analyzeImage(file: Express.Multer.File, message: string): 
 }
 
 // ── Answer status resolution ──────────────────────────────────────────────────
-//
-// n8n hanya set is_answered=false kalau workflow error. Kasus "tidak ada di
-// knowledge base" atau "butuh klarifikasi" tetap lolos sebagai is_answered=true
-// karena AI Agent sukses jalan. Fungsi ini mendeteksi pola jawaban LLM dan
-// meng-override status sesuai kondisi sebenarnya.
 
 const UNANSWERED_PATTERNS: RegExp[] = [
   /tidak memiliki informasi mengenai/i,
