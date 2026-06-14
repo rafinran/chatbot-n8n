@@ -1,4 +1,3 @@
-import fs from "fs";
 import type { Request, Response } from "express";
 import * as chatService from "../services/chat.service.ts";
 import { maybeEscalate } from "../services/overview.service.ts";
@@ -19,10 +18,13 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
     conversationId = await chatService.getOrCreateConversation(req.user.id);
   }
 
+  let imageUrl: string | undefined;
+
   try {
     let question = message;
 
     if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
       console.log("[CHAT] Gambar diterima, mulai analisis...");
       const imageAnalysis = await chatService.analyzeImage(req.file, message);
       question = `${message}\n\n[Hasil analisis gambar]:\n${imageAnalysis}`;
@@ -35,8 +37,7 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
     const isAnswered = chatService.resolveIsAnswered(n8nData.answer, n8nData.is_answered);
     console.log("[CHAT] is_answered (resolved):", isAnswered, "| raw:", n8nData.is_answered);
 
-    const userContent = req.file ? `[Gambar] ${message}` : message;
-    await chatService.appendSession(conversationId, userContent, n8nData.answer);
+    await chatService.appendSession(conversationId, message, n8nData.answer, imageUrl);
 
     // Log ke ChatLog (bukan ActivityLog)
     const chatLogId = await chatService.logChat(
@@ -58,13 +59,10 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
       console.warn("[CHAT] maybeEscalate error:", err.message);
     });
 
-    res.json({ response: n8nData.answer, is_answered: isAnswered, conversationId });
-  } finally {
-    if (req.file?.path) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.warn("[CLEANUP] Gagal hapus file:", err.message);
-      });
-    }
+    res.json({ response: n8nData.answer, is_answered: isAnswered, conversationId, imageUrl });
+  } catch (err: any) {
+    console.error("[CHAT] Error:", err.message);
+    res.status(500).json({ error: "Gagal memproses pesan." });
   }
 });
 
@@ -108,4 +106,24 @@ export const updateConversationTitle = asyncHandler(async (req: Request, res: Re
   const { title } = req.body;
   await chatService.updateConversationTitle(conversationId, title);
   res.json({ message: "Title diupdate." });
+});
+
+export const escalateChat = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { question } = req.body;
+  if (!question || typeof question !== "string" || question.trim().length === 0) {
+    res.status(400).json({ error: "Pertanyaan tidak boleh kosong." });
+    return;
+  }
+
+  const chatLogId = await chatService.logChat(req.user.id, question, false, false);
+  await maybeEscalate({
+    chatLogId,
+    userId: req.user.id,
+    isAnswered: false,
+    question,
+  }).catch((err) => {
+    console.warn("[CHAT] manual escalate error:", err.message);
+  });
+
+  res.json({ message: "Pertanyaan diteruskan ke tim admin." });
 });

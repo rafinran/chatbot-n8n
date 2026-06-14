@@ -17,19 +17,24 @@ import {
   ExternalLink,
   ThumbsUp,
   ThumbsDown,
-  Zap,
+  PanelLeftOpen,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sendMessage, getChatHistory, logout, getChatHistoryByConversation, createConversation } from "@/lib/api";
+import {
+  sendMessage,
+  getChatHistory,
+  logout,
+  getChatHistoryByConversation,
+  createConversation,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface Message {
-  id: string;                              // ← BARU: dipakai untuk track feedback
+  id: string;
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
@@ -54,7 +59,18 @@ const suggestions = [
 // ── Feedback Buttons ───────────────────────────────────────────────────────
 
 function FeedbackButtons({ messageId }: { messageId: string }) {
-  const [state, setState] = useState<FeedbackState>("idle");
+  const storageKey = `feedback_${messageId}`;
+  const [state, setState] = useState<FeedbackState>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem(storageKey) as FeedbackState) || "idle";
+    }
+    return "idle";
+  });
+
+  const updateState = (newState: FeedbackState) => {
+    setState(newState);
+    localStorage.setItem(storageKey, newState);
+  };
 
   if (state === "satisfied") {
     return (
@@ -67,56 +83,34 @@ function FeedbackButtons({ messageId }: { messageId: string }) {
 
   if (state === "escalated") {
     return (
-      <div className="mt-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
-        <div className="flex items-start gap-2">
-          <Zap size={14} className="text-amber-600 mt-0.5" />
-
-          <div>
-            <p className="text-sm font-medium text-amber-800">
-              Chat diteruskan ke Customer Service
-            </p>
-
-            <p className="mt-1 text-xs text-amber-700">
-              Kami mencatat bahwa jawaban AI belum menyelesaikan masalah Anda.
-              Percakapan ini akan diteruskan ke tim Customer Service untuk
-              ditinjau lebih lanjut.
-            </p>
-
-            <p className="mt-2 text-xs text-amber-600">
-              Nomor tiket: CS-{messageId.slice(0, 8).toUpperCase()}
-            </p>
-          </div>
-        </div>
-      </div>
+      <p className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-400">
+        <ThumbsDown size={12} className="text-red-400" />
+        Mohon maaf, jawaban ini belum membantu. Silakan coba pertanyaan lain.
+      </p>
     );
   }
 
   return (
     <div className="mt-2.5 flex items-center gap-3">
-      <p className="text-xs text-gray-400">
-        Apakah jawaban ini membantu?
-      </p>
-
+      <p className="text-xs text-gray-400">Apakah jawaban ini membantu?</p>
       <div className="flex items-center gap-1.5">
         <button
-          onClick={() => setState("satisfied")}
+          onClick={() => updateState("satisfied")}
           className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
         >
-          <ThumbsUp size={11} />
-          Ya
+          <ThumbsUp size={11} /> Ya
         </button>
-
         <button
-          onClick={() => setState("escalated")}
+          onClick={() => updateState("escalated")}
           className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-500"
         >
-          <ThumbsDown size={11} />
-          Tidak
+          <ThumbsDown size={11} /> Tidak
         </button>
       </div>
     </div>
   );
 }
+
 // ── useLinkPreview ─────────────────────────────────────────────────────────
 
 function useLinkPreview(url: string) {
@@ -125,16 +119,25 @@ function useLinkPreview(url: string) {
   useEffect(() => {
     let cancelled = false;
     const domain = (() => {
-      try { return new URL(url).hostname.replace("www.", ""); }
-      catch { return url; }
+      try {
+        return new URL(url).hostname.replace("www.", "");
+      } catch {
+        return url;
+      }
     })();
 
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then((r) => r.json())
-      .then((data) => { if (!cancelled) setMeta({ ...data, domain }); })
-      .catch(() => { if (!cancelled) setMeta({ domain }); });
+      .then((data) => {
+        if (!cancelled) setMeta({ ...data, domain });
+      })
+      .catch(() => {
+        if (!cancelled) setMeta({ domain });
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [url]);
 
   return meta;
@@ -166,7 +169,6 @@ function LinkPreviewCard({ url }: { url: string }) {
           <ExternalLink size={20} className="text-gray-400" />
         )}
       </div>
-
       <div className="flex min-w-0 flex-col justify-center px-3 py-2">
         {meta?.title ? (
           <p className="truncate text-xs font-medium text-gray-800 sm:text-sm">
@@ -175,7 +177,6 @@ function LinkPreviewCard({ url }: { url: string }) {
         ) : (
           <p className="truncate text-xs text-gray-500">{url}</p>
         )}
-
         <p className="mt-0.5 truncate text-[11px] text-gray-400">
           {meta?.domain ?? ""}
         </p>
@@ -188,10 +189,7 @@ function LinkPreviewCard({ url }: { url: string }) {
 
 const markdownComponents: Components = {
   a: ({ href, children }) => {
-    if (!href) {
-      return <span>{children}</span>;
-    }
-
+    if (!href) return <span>{children}</span>;
     return (
       <span className="inline-block w-full">
         <a
@@ -202,13 +200,13 @@ const markdownComponents: Components = {
         >
           {children}
         </a>
-
         <LinkPreviewCard url={href} />
       </span>
     );
   },
 };
 
+// ── Page ───────────────────────────────────────────────────────────────────
 
 export default function ChatbotPage() {
   const router = useRouter();
@@ -222,6 +220,8 @@ export default function ChatbotPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Mobile sidebar drawer
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,7 +233,10 @@ export default function ChatbotPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) { router.push("/login"); return; }
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     loadHistory();
   }, [authLoading, user, router, conversationId]);
 
@@ -241,13 +244,11 @@ export default function ChatbotPage() {
     try {
       setLoading(true);
       let response;
-      
       if (conversationId) {
         response = await getChatHistoryByConversation(conversationId);
       } else {
         response = await getChatHistory();
       }
-      
       if (response?.history && Array.isArray(response.history)) {
         setMessages(
           response.history.map((m: Omit<Message, "id">) => ({
@@ -277,7 +278,12 @@ export default function ChatbotPage() {
 
     const newMessages: Message[] = [
       ...messages,
-      { id: crypto.randomUUID(), role: "user", content: userMessage, imageUrl: imagePreviewUrl },
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: userMessage,
+        imageUrl: imagePreviewUrl,
+      },
     ];
     setMessages(newMessages);
     setSending(true);
@@ -288,32 +294,47 @@ export default function ChatbotPage() {
         const formData = new FormData();
         formData.append("message", userMessage);
         formData.append("image", imageFile);
-        if (conversationId) {
-          formData.append("conversationId", conversationId.toString());
-        }
+        if (conversationId) formData.append("conversationId", conversationId.toString());
         payload = formData;
       } else {
-        const messagePayload: any = { message: userMessage };
-        if (conversationId) {
-          messagePayload.conversationId = conversationId;
-        }
-        payload = JSON.stringify(messagePayload);
+        const msgPayload: { message: string; conversationId?: number } = {
+          message: userMessage,
+        };
+        if (conversationId) msgPayload.conversationId = conversationId;
+        payload = msgPayload;
       }
-      
+
       const response = await sendMessage(payload);
-      
+
       if (response?.conversationId && !conversationId) {
         setConversationId(response.conversationId);
       }
-      
+
+      // Ganti blob URL dengan persistent imageUrl dari backend
+      const updatedMessages = response.imageUrl
+        ? newMessages.map(msg =>
+            msg.role === "user" && msg.imageUrl
+              ? { ...msg, imageUrl: response.imageUrl }
+              : msg
+          )
+        : newMessages;
+
       setMessages([
-        ...newMessages,
-        { id: crypto.randomUUID(), role: "assistant", content: response.response },
+        ...updatedMessages,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: response.response,
+        },
       ]);
     } catch (err: any) {
       setMessages([
         ...newMessages,
-        { id: crypto.randomUUID(), role: "assistant", content: `Error: ${err.message || "Failed to send message"}` },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Error: ${err.message || "Failed to send message"}`,
+        },
       ]);
     } finally {
       setSending(false);
@@ -347,6 +368,17 @@ export default function ChatbotPage() {
     setPopupOpen(false);
   };
 
+  const handleSelectConversation = (id: number) => {
+    setConversationId(id);
+    setMobileSidebarOpen(false);
+  };
+
+  const handleNewConversation = () => {
+    setConversationId(null);
+    setMessages([]);
+    setMobileSidebarOpen(false);
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f6f6f7]">
@@ -364,7 +396,16 @@ export default function ChatbotPage() {
       {/* ── NAVBAR ── */}
       <header className="border-b bg-white z-10 flex-shrink-0">
         <div className="mx-auto flex h-14 sm:h-16 max-w-full items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-6 sm:gap-14">
+          <div className="flex items-center gap-3 sm:gap-6 lg:gap-14">
+            {/* Mobile: tombol buka sidebar */}
+            <button
+              onClick={() => setMobileSidebarOpen((o) => !o)}
+              className="md:hidden flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition text-gray-500"
+              title="Riwayat chat"
+            >
+              <PanelLeftOpen size={19} />
+            </button>
+
             <a href="/">
               <h1 className="text-base sm:text-xl font-bold text-[#0A2A8B] cursor-pointer whitespace-nowrap">
                 WEBSON & CHATSON
@@ -377,6 +418,7 @@ export default function ChatbotPage() {
               <a href="#" className="hover:text-[#0A2A8B] transition">Pricing</a>
             </nav>
           </div>
+
           <div className="flex items-center gap-3">
             <span className="hidden sm:block text-sm text-gray-600 truncate max-w-[120px]">
               {user?.fullName || user?.username}
@@ -387,6 +429,7 @@ export default function ChatbotPage() {
             >
               <LogOut size={16} /> Logout
             </button>
+            {/* Mobile: hamburger untuk nav links */}
             <button
               onClick={() => setMobileMenuOpen((o) => !o)}
               className="md:hidden flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition"
@@ -414,235 +457,266 @@ export default function ChatbotPage() {
       </header>
 
       {/* ── SIDEBAR + MAIN ── */}
-      <div className="flex-1 flex flex-row overflow-hidden">
-        {/* Sidebar - hidden on mobile, visible on larger screens */}
-        <div className="hidden md:block">
+      <div className="flex-1 flex flex-row overflow-hidden relative">
+
+        {/* Mobile sidebar overlay */}
+        {mobileSidebarOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="md:hidden fixed inset-0 z-20 bg-black/30"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            {/* Drawer */}
+            <div className="md:hidden fixed left-0 top-0 bottom-0 z-30 pt-14">
+              <ConversationSidebar
+                activeConversationId={conversationId}
+                onSelectConversation={handleSelectConversation}
+                onNewConversation={handleNewConversation}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Desktop sidebar — collapsible handled internally */}
+        <div className="hidden md:flex h-full">
           <ConversationSidebar
             activeConversationId={conversationId}
-            onSelectConversation={(id) => {
-              setConversationId(id);
-            }}
-            onNewConversation={() => {
-              setConversationId(null);
-              setMessages([]);
-            }}
+            onSelectConversation={handleSelectConversation}
+            onNewConversation={handleNewConversation}
           />
         </div>
-        
-        {/* Main chat area */}
+
+        {/* ── MAIN CHAT ── */}
         <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          {messages.length === 0 ? (
+          <div className="flex-1 overflow-y-auto">
+            {messages.length === 0 ? (
 
-            /* ── Empty state ── */
-            <section className="flex min-h-full flex-col items-center justify-center px-4 sm:px-6 py-10">
-              <div className="mb-6 sm:mb-8 flex h-20 w-20 sm:h-28 sm:w-28 items-center justify-center rounded-full border bg-white shadow-sm">
-                <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
-                  <Bot size={26} className="sm:hidden" />
-                  <Bot size={34} className="hidden sm:block" />
+              /* Empty state */
+              <section className="flex min-h-full flex-col items-center justify-center px-4 sm:px-6 py-10">
+                <div className="mb-6 sm:mb-8 flex h-20 w-20 sm:h-28 sm:w-28 items-center justify-center rounded-full border bg-white shadow-sm">
+                  <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                    <Bot size={26} className="sm:hidden" />
+                    <Bot size={34} className="hidden sm:block" />
+                  </div>
                 </div>
-              </div>
-              <h1 className="text-center text-3xl sm:text-4xl lg:text-5xl font-bold text-[#0A2A8B]">
-                Hi, I'm Chatson
-              </h1>
-              <p className="mt-3 text-center text-base sm:text-lg text-muted-foreground">
-                Anything I can help with today?
-              </p>
-              <div className="mt-8 sm:mt-12 grid w-full max-w-xs sm:max-w-xl lg:max-w-3xl grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {suggestions.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => setMessage(item)}
-                    className="rounded-full border bg-white px-4 sm:px-6 py-3 sm:py-4 text-sm shadow-sm transition hover:border-[#0A2A8B] hover:shadow-md text-left sm:text-center"
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-          ) : (
-
-            /* ── Chat messages ── */
-            <section className="px-3 sm:px-6 py-6 sm:py-8">
-              <div className="max-w-3xl mx-auto space-y-5 sm:space-y-6">
-                {messages.map((msg) => (
-                  <div key={msg.id}>
-                    {msg.role === "user" ? (
-
-                      /* User bubble */
-                      <div className="flex justify-end">
-                        <div className="max-w-[85%] sm:max-w-[75%] flex flex-col items-end gap-2">
-                          {msg.imageUrl && (
-                            <img
-                              src={msg.imageUrl}
-                              alt="uploaded"
-                              className="max-h-48 sm:max-h-60 rounded-2xl object-cover border border-white/20 shadow"
-                            />
-                          )}
-                          <div className="rounded-2xl bg-[#0A2A8B] px-4 sm:px-5 py-3 text-white">
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                              {msg.content}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                    ) : (
-
-                      /* ── Assistant bubble ── */
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="flex-shrink-0 mt-0.5 flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
-                          <Bot size={13} className="sm:hidden" />
-                          <Bot size={14} className="hidden sm:block" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900 overflow-hidden">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                              {msg.content}
-                            </ReactMarkdown>
-                          </div>
-
-                          {/* ── FEEDBACK BUTTONS ── */}
-                          <FeedbackButtons messageId={msg.id} />
-
-                        </div>
-                      </div>
-
-                    )}
-                  </div>
-                ))}
-
-                {/* Typing indicator */}
-                {sending && (
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <div className="flex-shrink-0 mt-0.5 flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
-                      <Bot size={13} />
-                    </div>
-                    <div className="flex gap-1 px-4 py-3 bg-gray-100 rounded-2xl w-fit items-center">
-                      <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "0ms" }} />
-                      <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "150ms" }} />
-                      <span className="animate-bounce w-2 h-2 bg-[#0A2A8B]/60 rounded-full" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* ── INPUT AREA ── */}
-        <div className="flex-shrink-0 border-t bg-white px-3 sm:px-6 py-4 sm:py-6">
-          <div className="max-w-3xl mx-auto">
-            {attachedFiles.length > 0 && (
-              <div className="mb-2 flex gap-2 flex-wrap">
-                {attachedFiles.map((f, i) => (
-                  <div key={i} className="relative inline-block">
-                    <img
-                      src={URL.createObjectURL(f)}
-                      alt={f.name}
-                      className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-gray-200 shadow-sm"
-                    />
+                <h1 className="text-center text-3xl sm:text-4xl lg:text-5xl font-bold text-[#0A2A8B]">
+                  Hi, I'm Chatson
+                </h1>
+                <p className="mt-3 text-center text-base sm:text-lg text-muted-foreground">
+                  Anything I can help with today?
+                </p>
+                <div className="mt-8 sm:mt-12 grid w-full max-w-xs sm:max-w-xl lg:max-w-3xl grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  {suggestions.map((item) => (
                     <button
-                      onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-500 transition"
+                      key={item}
+                      onClick={() => setMessage(item)}
+                      className="rounded-full border bg-white px-4 sm:px-6 py-3 sm:py-4 text-sm shadow-sm transition hover:border-[#0A2A8B] hover:shadow-md text-left sm:text-center"
                     >
-                      <X size={11} />
+                      {item}
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              </section>
 
-            <div className="flex items-center rounded-full border bg-white px-2 sm:px-3 shadow-lg gap-1">
-              <div className="relative flex-shrink-0">
-                <button
-                  onClick={() => setPopupOpen((o) => !o)}
-                  className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-[#0A2A8B] hover:text-[#0A2A8B] transition relative"
-                >
-                  <Plus size={16} />
-                  {pendingFiles.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#0A2A8B] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                      {pendingFiles.length}
-                    </span>
-                  )}
-                </button>
+            ) : (
 
-                {popupOpen && (
-                  <div className="absolute bottom-12 left-0 z-20 w-60 sm:w-64 rounded-2xl border bg-white shadow-xl p-4">
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                      Lampirkan Gambar
-                    </p>
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-                      className="border-2 border-dashed border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#0A2A8B] hover:bg-blue-50 transition"
-                    >
-                      <ImageUp size={26} className="text-[#0A2A8B]" />
-                      <span className="text-sm font-medium text-center">Klik atau seret gambar</span>
-                      <span className="text-[11px] text-muted-foreground">PNG, JPG, GIF, WEBP</span>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => handleFiles(e.target.files)}
-                    />
-                    {pendingFiles.length > 0 && (
-                      <div className="mt-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
-                        {pendingFiles.map((f, i) => (
-                          <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
-                            <img src={URL.createObjectURL(f)} alt={f.name} className="w-8 h-8 rounded object-cover flex-shrink-0" />
-                            <span className="text-xs flex-1 truncate text-gray-700">{f.name}</span>
-                            <button onClick={() => removeFile(i)} className="text-gray-400 hover:text-red-500 transition flex-shrink-0">
-                              <X size={14} />
-                            </button>
+              /* Chat messages */
+              <section className="px-3 sm:px-6 py-6 sm:py-8">
+                <div className="max-w-3xl mx-auto space-y-5 sm:space-y-6">
+                  {messages.map((msg) => (
+                    <div key={msg.id}>
+                      {msg.role === "user" ? (
+
+                        /* User bubble */
+                        <div className="flex justify-end">
+                          <div className="max-w-[85%] sm:max-w-[75%] flex flex-col items-end gap-2">
+                            {msg.imageUrl && (
+                              <img
+                                src={msg.imageUrl}
+                                alt="uploaded"
+                                className="max-h-48 sm:max-h-60 rounded-2xl object-cover border border-white/20 shadow"
+                              />
+                            )}
+                            <div className="rounded-2xl bg-[#0A2A8B] px-4 sm:px-5 py-3 text-white">
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                {msg.content}
+                              </p>
+                            </div>
                           </div>
-                        ))}
+                        </div>
+
+                      ) : (
+
+                        /* Assistant bubble */
+                        <div className="flex items-start gap-2 sm:gap-3">
+                          <div className="flex-shrink-0 mt-0.5 flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                            <Bot size={13} className="sm:hidden" />
+                            <Bot size={14} className="hidden sm:block" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm leading-relaxed text-gray-800 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-5 prose-ul:list-disc prose-ol:my-1 prose-ol:pl-5 prose-ol:list-decimal prose-li:my-0.5 prose-strong:font-semibold prose-strong:text-gray-900 overflow-hidden">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={markdownComponents}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            </div>
+                            <FeedbackButtons messageId={msg.id} />
+                          </div>
+                        </div>
+
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Skeleton loading bubble */}
+                  {sending && (
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <div className="flex-shrink-0 mt-1 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#0A2A8B] text-white">
+                        <Bot size={14} />
                       </div>
-                    )}
-                    <div className="mt-3 flex justify-end">
+                      <div className="flex flex-col gap-2 px-4 py-3 bg-gray-100 rounded-2xl rounded-tl-sm max-w-[85%] sm:max-w-[75%] min-w-[200px]">
+                        <div className="h-3 bg-gray-300 rounded-full animate-pulse w-[85%]" />
+                        <div className="h-3 bg-gray-300 rounded-full animate-pulse w-[60%]" style={{ animationDelay: "200ms" }} />
+                        <div className="h-3 bg-gray-300 rounded-full animate-pulse w-[72%]" style={{ animationDelay: "400ms" }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+              </section>
+
+            )}
+          </div>
+
+          {/* ── INPUT AREA ── */}
+          <div className="flex-shrink-0 border-t bg-white px-3 sm:px-6 py-4 sm:py-6">
+            <div className="max-w-3xl mx-auto">
+              {attachedFiles.length > 0 && (
+                <div className="mb-2 flex gap-2 flex-wrap">
+                  {attachedFiles.map((f, i) => (
+                    <div key={i} className="relative inline-block">
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt={f.name}
+                        className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-gray-200 shadow-sm"
+                      />
                       <button
-                        onClick={attachImages}
-                        className="bg-[#0A2A8B] hover:bg-[#081f66] text-white text-sm px-4 py-1.5 rounded-lg transition"
+                        onClick={() =>
+                          setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))
+                        }
+                        className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-500 transition"
                       >
-                        Lampirkan
+                        <X size={11} />
                       </button>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center rounded-full border bg-white px-2 sm:px-3 shadow-lg gap-1">
+                {/* Plus / attach */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setPopupOpen((o) => !o)}
+                    className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-[#0A2A8B] hover:text-[#0A2A8B] transition relative"
+                  >
+                    <Plus size={16} />
+                    {pendingFiles.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-[#0A2A8B] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                        {pendingFiles.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {popupOpen && (
+                    <div className="absolute bottom-12 left-0 z-20 w-60 sm:w-64 rounded-2xl border bg-white shadow-xl p-4">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Lampirkan Gambar
+                      </p>
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleFiles(e.dataTransfer.files);
+                        }}
+                        className="border-2 border-dashed border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#0A2A8B] hover:bg-blue-50 transition"
+                      >
+                        <ImageUp size={26} className="text-[#0A2A8B]" />
+                        <span className="text-sm font-medium text-center">Klik atau seret gambar</span>
+                        <span className="text-[11px] text-muted-foreground">PNG, JPG, GIF, WEBP</span>
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFiles(e.target.files)}
+                      />
+                      {pendingFiles.length > 0 && (
+                        <div className="mt-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
+                          {pendingFiles.map((f, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
+                              <img
+                                src={URL.createObjectURL(f)}
+                                alt={f.name}
+                                className="w-8 h-8 rounded object-cover flex-shrink-0"
+                              />
+                              <span className="text-xs flex-1 truncate text-gray-700">{f.name}</span>
+                              <button
+                                onClick={() => removeFile(i)}
+                                className="text-gray-400 hover:text-red-500 transition flex-shrink-0"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          onClick={attachImages}
+                          className="bg-[#0A2A8B] hover:bg-[#081f66] text-white text-sm px-4 py-1.5 rounded-lg transition"
+                        >
+                          Lampirkan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Input
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !sending) handleSubmit();
+                  }}
+                  placeholder="Ask Chatson anything..."
+                  className="border-0 bg-transparent shadow-none focus-visible:ring-0 h-12 sm:h-14 text-sm"
+                  disabled={sending}
+                />
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={sending || !message.trim()}
+                  className="flex-shrink-0 flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#0A2A8B] text-white transition hover:bg-[#081f66] disabled:opacity-40"
+                >
+                  <SendHorizonal size={16} className="sm:hidden" />
+                  <SendHorizonal size={18} className="hidden sm:block" />
+                </button>
               </div>
 
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !sending) handleSubmit(); }}
-                placeholder="Ask Chatson anything..."
-                className="border-0 bg-transparent shadow-none focus-visible:ring-0 h-12 sm:h-14 text-sm"
-                disabled={sending}
-              />
-
-              <button
-                onClick={handleSubmit}
-                disabled={sending || !message.trim()}
-                className="flex-shrink-0 flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#0A2A8B] text-white transition hover:bg-[#081f66] disabled:opacity-40"
-              >
-                <SendHorizonal size={16} className="sm:hidden" />
-                <SendHorizonal size={18} className="hidden sm:block" />
-              </button>
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Chatson AI can make mistakes. Consider verifying important information.
+              </p>
             </div>
-
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Chatson AI can make mistakes. Consider verifying important information.
-            </p>
           </div>
-        </div>
-      </main>
+        </main>
       </div>
     </div>
   );

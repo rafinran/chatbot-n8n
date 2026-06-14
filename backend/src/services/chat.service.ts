@@ -1,10 +1,7 @@
 import fs from "fs";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from "../db.ts";
 import { env, SESSION_MAX_ROWS } from "../config/env.ts";
 import type { ChatMessage, N8nResponseDto } from "../dto/chat.dto.ts";
-
-const genAI = new GoogleGenerativeAI(env.googleApiKey);
 
 // ── Conversation helpers ──────────────────────────────────────────────────────
 
@@ -65,18 +62,23 @@ export async function getSession(conversationId: number): Promise<ChatMessage[]>
     const msg = row.message as any;
     const role: "user" | "assistant" = msg?.data?.type === "human" ? "user" : "assistant";
     const content: string = msg?.data?.content ?? "";
-    return content ? [{ role, content }] : [];
+    const imageUrl: string | undefined = msg?.data?.imageUrl ?? undefined;
+    return content ? [{ role, content, ...(imageUrl && { imageUrl }) }] : [];
   });
 }
 
 export async function appendSession(
   conversationId: number,
   userContent: string,
-  assistantContent: string
+  assistantContent: string,
+  imageUrl?: string
 ): Promise<void> {
+  const userMessage: any = { type: "human", data: { type: "human", content: userContent } };
+  if (imageUrl) userMessage.data.imageUrl = imageUrl;
+
   await prisma.n8n_chat_histories.createMany({
     data: [
-      { conversationId, message: { type: "human", data: { type: "human", content: userContent } } },
+      { conversationId, message: userMessage },
       { conversationId, message: { type: "ai", data: { type: "ai", content: assistantContent } } },
     ],
   });
@@ -122,30 +124,47 @@ PENTING: Analisis gambar MAKSIMAL 50 KATA. Fokus HANYA pada:
 
 JANGAN jelaskan panjang lebar. LANGSUNG KE POIN.`;
 
-  // Try Gemini Cloud with timeout
+  // Try OpenCode MiniMax M3 (OpenAI-compatible)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), IMAGE_ANALYSIS_TIMEOUT);
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
-    const result = await Promise.race([
-      model.generateContent([
-        promptText,
-        { inlineData: { mimeType: file.mimetype, data: base64 } },
-      ]),
+    const ocRes = await Promise.race([
+      fetch("https://api.opencode.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${env.opencodeApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "minimax/M3",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: promptText },
+              { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
+            ],
+          }],
+          max_tokens: 50,
+        }),
+        signal: controller.signal,
+      }),
       new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Image analysis timeout")), IMAGE_ANALYSIS_TIMEOUT);
       }),
     ]);
     clearTimeout(timeoutId);
-    return (result as any).response.text();
+    const res = ocRes as Response;
+    if (!res.ok) throw new Error(`OpenCode error: ${res.status}`);
+    const data = await res.json() as any;
+    return data.choices?.[0]?.message?.content ?? "";
   } catch (err) {
     clearTimeout(timeoutId);
-    console.error("[CHAT] Gemini error: ", err);
-    console.warn("[CHAT] Fallback ke openRouter...");
+    console.error("[CHAT] OpenCode MiniMax error: ", err);
+    console.warn("[CHAT] Fallback ke OpenRouter Qwen...");
   }
 
-  // Fallback via OpenRouter (also with timeout)
+  // Fallback via OpenRouter Qwen 3.5 Flash
   if (!env.openRouterApiKey) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
 
   const controller2 = new AbortController();
@@ -177,8 +196,9 @@ JANGAN jelaskan panjang lebar. LANGSUNG KE POIN.`;
       }),
     ]);
     clearTimeout(timeoutId2);
-    if (!orRes.ok) throw new Error("OpenRouter error");
-    const orData = await orRes.json() as any;
+    const res = orRes as Response;
+    if (!res.ok) throw new Error("OpenRouter error");
+    const orData = await res.json() as any;
     return orData.choices?.[0]?.message?.content ?? "";
   } catch (err: any) {
     clearTimeout(timeoutId2);
@@ -197,6 +217,8 @@ const UNANSWERED_PATTERNS: RegExp[] = [
   /tidak ada informasi.*tersebut/i,
   /di luar cakupan/i,
   /tidak tersedia dalam knowledge base/i,
+  /akan diteruskan ke tim admin/i,
+  /akan dikirim ke admin/i,
 ];
 
 export function resolveIsAnswered(answer: string, n8nIsAnswered: boolean): boolean {

@@ -1,4 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
@@ -32,6 +34,11 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Static serving untuk upload gambar chat (7 hari retensi)
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 app.use("/api/auth",  authRouter);
 app.use("/api/chat",  chatRouter);
@@ -97,6 +104,25 @@ setTimeout(() => {
   pingN8nWebhook();
   setInterval(pingN8nWebhook, N8N_KEEPALIVE_INTERVAL);
 }, 5000);
+
+// ── Cleanup upload gambar > 7 hari ──
+const CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // setiap 6 jam
+function cleanUploads() {
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+  try {
+    fs.readdirSync(UPLOAD_DIR).forEach((file) => {
+      const filePath = path.join(UPLOAD_DIR, file);
+      if (Date.now() - fs.statSync(filePath).mtimeMs > SEVEN_DAYS) {
+        fs.unlinkSync(filePath);
+      }
+    });
+  } catch { /* ignore */ }
+}
+setTimeout(() => {
+  console.log("[CLEANUP] Starting upload cleanup (every 6 hours, files > 7 days)");
+  cleanUploads();
+  setInterval(cleanUploads, CLEANUP_INTERVAL);
+}, 10_000);
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
