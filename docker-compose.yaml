@@ -25,6 +25,7 @@ services:
       ADMIN_PASSWORD:     ${ADMIN_PWD}
       JWT_SECRET:         ${JWT_SECRET}
       GOOGLE_API_KEY:     ${GOOGLE_API_KEY}
+      OPENCODE_API_KEY:   ${OPENCODE_API_KEY}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       N8N_WEBHOOK_URL:    ${N8N_WEBHOOK_URL}
       FRONTEND_URL:       ${FRONTEND_URL}
@@ -101,7 +102,7 @@ services:
       - N8N_SECURE_COOKIE=false
       - N8N_ENCRYPTION_KEY=${N8N_SECRET}
       - TZ=Asia/Jakarta
-      - N8N_CORS_ALLOWED_ORIGINS=*
+      - N8N_CORS_ALLOWED_ORIGINS=${N8N_CORS_ORIGINS:-*}
     volumes:
       - ./rag/n8n_data:/home/node/.n8n
       - ./knowledge-base:/home/node/knowledge-base

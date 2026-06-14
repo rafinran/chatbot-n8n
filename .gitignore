@@ -57,27 +57,12 @@ lerna-debug.log*
 *.seed
 *.pid.lock
 
-
-GOOGLE_API_KEY=AIzxxxxxxxxxxxxxxxxxxxxxxxx
-OPENROUTER_API_KEY=sk-or-xxxxxxxxxxxxxxxxx
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
-REPORT_RECIPIENT=email@domain.com
-QDRANT_COLLECTION=knowledge_base_epson
-```
-
----
-
-## Akses Aplikasi
-
-| URL                                | Keterangan                          |
-|------------------------------------|-
 # ── Testing ───────────────────────────────────────────────────
 /coverage
 .nyc_output
 
 # ── OS ─────────────────────────────────────────────────────────
 Thumbs.db
-.DS_Store
 .AppleDouble
 .LSOverride
 
