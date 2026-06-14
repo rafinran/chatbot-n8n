@@ -9,7 +9,6 @@ const genAI = new GoogleGenerativeAI(env.googleApiKey);
 // ── Conversation helpers ──────────────────────────────────────────────────────
 
 export async function getOrCreateConversation(userId: number): Promise<number> {
-  // Return conversation aktif (paling recent), atau buat baru jika tidak ada
   let conversation = await prisma.conversation.findFirst({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -82,7 +81,6 @@ export async function appendSession(
     ],
   });
 
-  // Update conversation timestamp & auto-generate title from first message if not set
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
   });
@@ -90,13 +88,11 @@ export async function appendSession(
   if (conversation) {
     const updates: any = { updatedAt: new Date() };
     if (!conversation.title || conversation.title === "New conversation") {
-      // Generate title dari first 50 chars of user content
       updates.title = userContent.slice(0, 50);
     }
     await prisma.conversation.update({ where: { id: conversationId }, data: updates });
   }
 
-  // Trim ke SESSION_MAX_ROWS
   const allRows = await prisma.n8n_chat_histories.findMany({
     where: { conversationId },
     orderBy: { id: "asc" },
@@ -108,49 +104,87 @@ export async function appendSession(
   }
 }
 
-// ── Image analysis ────────────────────────────────────────────────────────────
+// ── Image analysis (OPTIMIZED) ────────────────────────────────────────────────
+
+const IMAGE_ANALYSIS_TIMEOUT = 20 * 1000; // 20 seconds timeout
 
 export async function analyzeImage(file: Express.Multer.File, message: string): Promise<string> {
   const base64 = fs.readFileSync(file.path).toString("base64");
-  const promptText = `${message}\n\nAnalisis gambar ini secara detail. Jika ada defect atau masalah kualitas cetak, sebutkan: jenis masalah, lokasi pada gambar, tingkat keparahan, dan rekomendasi tindak lanjut.`;
 
-  // Coba Gemini Cloud dulu
+  // Strict prompt to limit output to max 50 words
+  const promptText = `${message}
+
+PENTING: Analisis gambar MAKSIMAL 50 KATA. Fokus HANYA pada:
+- Jenis masalah/defect (1-2 kata)
+- Lokasi pada gambar (1-2 kata)
+- Tingkat keparahan (1-2 kata)
+- Rekomendasi singkat (3-5 kata)
+
+JANGAN jelaskan panjang lebar. LANGSUNG KE POIN.`;
+
+  // Try Gemini Cloud with timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), IMAGE_ANALYSIS_TIMEOUT);
+
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
-    const result = await model.generateContent([
-      promptText,
-      { inlineData: { mimeType: file.mimetype, data: base64 } },
+    const result = await Promise.race([
+      model.generateContent([
+        promptText,
+        { inlineData: { mimeType: file.mimetype, data: base64 } },
+      ]),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Image analysis timeout")), IMAGE_ANALYSIS_TIMEOUT);
+      }),
     ]);
-    return result.response.text();
+    clearTimeout(timeoutId);
+    return (result as any).response.text();
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error("[CHAT] Gemini error: ", err);
     console.warn("[CHAT] Fallback ke openRouter...");
   }
 
-  // Fallback via OpenRouter
+  // Fallback via OpenRouter (also with timeout)
   if (!env.openRouterApiKey) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
 
-  const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${env.openRouterApiKey}`,
-    },
-    body: JSON.stringify({
-      model: "qwen/qwen3.5-flash-02-23",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: promptText },
-          { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
-        ],
-      }],
-    }),
-  });
-  if (!orRes.ok) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+  const controller2 = new AbortController();
+  const timeoutId2 = setTimeout(() => controller2.abort(), IMAGE_ANALYSIS_TIMEOUT);
 
-  const orData = await orRes.json() as any;
-  return orData.choices?.[0]?.message?.content ?? "";
+  try {
+    const orRes = await Promise.race([
+      fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${env.openRouterApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "qwen/qwen3.5-flash-02-23",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: promptText },
+              { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
+            ],
+          }],
+          max_tokens: 50,
+        }),
+        signal: controller2.signal,
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("OpenRouter timeout")), IMAGE_ANALYSIS_TIMEOUT);
+      }),
+    ]);
+    clearTimeout(timeoutId2);
+    if (!orRes.ok) throw new Error("OpenRouter error");
+    const orData = await orRes.json() as any;
+    return orData.choices?.[0]?.message?.content ?? "";
+  } catch (err: any) {
+    clearTimeout(timeoutId2);
+    console.error("[CHAT] OpenRouter error: ", err);
+    throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+  }
 }
 
 // ── Answer status resolution ──────────────────────────────────────────────────

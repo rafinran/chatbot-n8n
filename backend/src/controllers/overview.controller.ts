@@ -39,3 +39,16 @@ export const resolveEscalation = asyncHandler(async (req: Request, res: Response
   await overviewService.resolveEscalation(id);
   res.json({ message: "Tiket berhasil diselesaikan." });
 });
+
+export const replyEscalation = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) return res.status(400).json({ error: "ID tidak valid." });
+
+  const { message } = req.body;
+  if (!message || typeof message !== "string" || message.trim().length === 0) {
+    return res.status(400).json({ error: "Pesan balasan tidak boleh kosong." });
+  }
+
+  await overviewService.replyToEscalation(id, message.trim());
+  res.json({ message: "Balasan berhasil dikirim ke pengguna." });
+});

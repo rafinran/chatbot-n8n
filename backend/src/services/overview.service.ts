@@ -228,3 +228,37 @@ export async function maybeEscalate(params: {
     },
   });
 }
+
+// ── Reply to escalation via email ──────────────────────────────────────────
+
+import { sendEscalationReply } from "./email.service.ts";
+
+export async function replyToEscalation(
+  ticketId: number,
+  message: string
+): Promise<void> {
+  const ticket = await prisma.escalationTicket.findUnique({
+    where: { id: ticketId },
+    include: {
+      user: { select: { email: true, fullName: true } },
+      chatLog: { select: { question: true } },
+    },
+  });
+
+  if (!ticket) throw new Error("Tiket tidak ditemukan.");
+
+  // Send email to user
+  const originalQuestion = ticket.chatLog?.question ?? ticket.question ?? "";
+  await sendEscalationReply(
+    ticket.user.email,
+    ticket.user.fullName,
+    originalQuestion,
+    message
+  );
+
+  // Mark ticket as resolved
+  await prisma.escalationTicket.update({
+    where: { id: ticketId },
+    data: { status: "resolved", resolvedAt: new Date() },
+  });
+}

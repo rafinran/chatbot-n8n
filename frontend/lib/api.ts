@@ -184,3 +184,37 @@ export async function getEscalations(status?: string, search?: string) {
 export async function resolveEscalation(id: number) {
   return apiCall(`/admin/escalations/${id}/resolve`, { method: "PATCH" });
 }
+
+// Conversation endpoints
+export async function listConversations() {
+  return apiCall("/chat/conversations");
+}
+
+export async function createConversation(title?: string) {
+  return apiCall("/chat/conversations", {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function deleteConversation(id: number) {
+  return apiCall(`/chat/conversations/${id}`, { method: "DELETE" });
+}
+
+export async function updateConversationTitle(id: number, title: string) {
+  return apiCall(`/chat/conversations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function getChatHistoryByConversation(conversationId: number) {
+  return apiCall(`/chat/history?conversationId=${conversationId}`);
+}
+
+export async function replyEscalation(id: number, message: string) {
+  return apiCall(`/admin/escalations/${id}/reply`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}

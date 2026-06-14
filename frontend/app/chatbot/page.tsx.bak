@@ -22,9 +22,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sendMessage, getChatHistory, logout, getChatHistoryByConversation, createConversation } from "@/lib/api";
+import { sendMessage, getChatHistory, logout } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { ConversationSidebar } from "@/components/ConversationSidebar";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -222,7 +221,6 @@ export default function ChatbotPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [conversationId, setConversationId] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -235,20 +233,14 @@ export default function ChatbotPage() {
     if (authLoading) return;
     if (!user) { router.push("/login"); return; }
     loadHistory();
-  }, [authLoading, user, router, conversationId]);
+  }, [authLoading, user, router]);
 
   const loadHistory = async () => {
     try {
       setLoading(true);
-      let response;
-      
-      if (conversationId) {
-        response = await getChatHistoryByConversation(conversationId);
-      } else {
-        response = await getChatHistory();
-      }
-      
+      const response = await getChatHistory();
       if (response?.history && Array.isArray(response.history)) {
+        // Pastikan history lama juga punya id
         setMessages(
           response.history.map((m: Omit<Message, "id">) => ({
             ...m,
@@ -283,29 +275,15 @@ export default function ChatbotPage() {
     setSending(true);
 
     try {
-      let payload;
+      let response;
       if (imageFile) {
         const formData = new FormData();
         formData.append("message", userMessage);
         formData.append("image", imageFile);
-        if (conversationId) {
-          formData.append("conversationId", conversationId.toString());
-        }
-        payload = formData;
+        response = await sendMessage(formData);
       } else {
-        const messagePayload: any = { message: userMessage };
-        if (conversationId) {
-          messagePayload.conversationId = conversationId;
-        }
-        payload = JSON.stringify(messagePayload);
+        response = await sendMessage(userMessage);
       }
-      
-      const response = await sendMessage(payload);
-      
-      if (response?.conversationId && !conversationId) {
-        setConversationId(response.conversationId);
-      }
-      
       setMessages([
         ...newMessages,
         { id: crypto.randomUUID(), role: "assistant", content: response.response },
@@ -413,24 +391,8 @@ export default function ChatbotPage() {
         )}
       </header>
 
-      {/* ── SIDEBAR + MAIN ── */}
-      <div className="flex-1 flex flex-row overflow-hidden">
-        {/* Sidebar - hidden on mobile, visible on larger screens */}
-        <div className="hidden md:block">
-          <ConversationSidebar
-            activeConversationId={conversationId}
-            onSelectConversation={(id) => {
-              setConversationId(id);
-            }}
-            onNewConversation={() => {
-              setConversationId(null);
-              setMessages([]);
-            }}
-          />
-        </div>
-        
-        {/* Main chat area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+      {/* ── MAIN ── */}
+      <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
 
@@ -643,7 +605,6 @@ export default function ChatbotPage() {
           </div>
         </div>
       </main>
-      </div>
     </div>
   );
 }

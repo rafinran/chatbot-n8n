@@ -23,4 +23,4 @@ export const COOKIE_MAX_AGE = 8 * 60 * 60 * 1000; // 8 jam
 export const JWT_EXPIRES_IN = "8h";
 export const UPLOAD_MAX_SIZE_MB = 10;
 export const DOCS_MAX_SIZE_MB = 50;
-export const SESSION_MAX_ROWS = 40;
+export const SESSION_MAX_ROWS = 8;  // Reduced from 40 to keep context window smaller for faster response

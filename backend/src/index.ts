@@ -69,6 +69,40 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction): void => {
   res.status(status).json({ error: message });
 });
 
-app.listen(env.port, "0.0.0.0", () => {
+const server = app.listen(env.port, "0.0.0.0", () => {
   console.log(`✅ Backend running on port ${env.port}`);
+});
+
+// ── Keep-alive ping to n8n webhook (every 5 minutes) to prevent cold start ──
+const N8N_KEEPALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+function pingN8nWebhook() {
+  fetch(env.n8nWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: "[KEEPALIVE]",
+      user_id: "0",
+      user_email: "system@keepalive",
+    }),
+  }).catch((err) => {
+    // Silently fail - this is just a keep-alive ping
+    console.warn("[KEEPALIVE] n8n ping failed:", err.message);
+  });
+}
+
+// Start keep-alive after server is running
+setTimeout(() => {
+  console.log("[KEEPALIVE] Starting n8n webhook keep-alive pings (every 5 minutes)");
+  pingN8nWebhook();
+  setInterval(pingN8nWebhook, N8N_KEEPALIVE_INTERVAL);
+}, 5000);
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
 });

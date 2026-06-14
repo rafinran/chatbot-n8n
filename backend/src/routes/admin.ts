@@ -52,5 +52,6 @@ router.get("/overview/top-topics",  requireAuth, requireAdmin, overviewControlle
 router.get("/escalations",           requireAuth, requireAdmin, overviewController.listEscalations);
 router.get("/escalations/stats",     requireAuth, requireAdmin, overviewController.getEscalationStats);
 router.patch("/escalations/:id/resolve", requireAuth, requireAdmin, overviewController.resolveEscalation);
+router.post("/escalations/:id/reply", requireAuth, requireAdmin, overviewController.replyEscalation);
 
 export default router;
