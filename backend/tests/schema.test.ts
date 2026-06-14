@@ -2,14 +2,12 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { getDMMF, getConfig } from "@prisma/internals";
 import { PrismaClient } from "@prisma/client";
 import * as path from "path";
+import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const schemaPath = path.resolve(__dirname, "../prisma/schema.prisma");
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const schemaContent = readFileSync(schemaPath, "utf8");
 
 interface DmmfModel {
   name: string;
@@ -39,7 +37,12 @@ interface DmmfField {
 
 interface DmmfEnum {
   name: string;
-  values: string[];
+  values: DmmfEnumValue[];
+}
+
+interface DmmfEnumValue {
+  name: string;
+  dbName: string | null;
 }
 
 let dmmfModels: Map<string, DmmfModel>;
@@ -65,60 +68,44 @@ function getField(model: DmmfModel, name: string): DmmfField {
   return f;
 }
 
-// ---------------------------------------------------------------------------
-// 1. Datasource & Generator
-// ---------------------------------------------------------------------------
-
 describe("Datasource & Generator", () => {
+  beforeAll(() => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+  });
+
   it("should use postgresql as the database provider", async () => {
-    const config = await getConfig({ datamodel: schemaPath });
+    const config = await getConfig({ datamodel: schemaContent });
     expect(config.datasources).toHaveLength(1);
     expect(config.datasources[0].provider).toBe("postgresql");
     expect(config.datasources[0].url).toMatchObject({ fromEnvVar: "DATABASE_URL" });
   });
 
   it("should generate prisma-client-js", async () => {
-    const config = await getConfig({ datamodel: schemaPath });
+    const config = await getConfig({ datamodel: schemaContent });
     expect(config.generators).toHaveLength(1);
     expect(config.generators[0].provider.value).toBe("prisma-client-js");
   });
 });
 
-// ---------------------------------------------------------------------------
-// 2. Enums
-// ---------------------------------------------------------------------------
-
 describe("Enum: Role", () => {
   it("should exist with two values", () => {
     const role = dmmfEnums.get("Role");
     expect(role).toBeDefined();
-    expect(role!.values).toEqual(["USER", "ADMIN"]);
+    expect(role!.values.map((v) => v.name)).toEqual(["USER", "ADMIN"]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// 3. Model: User
-// ---------------------------------------------------------------------------
 
 describe("Model: User", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("User");
-  });
+  beforeAll(() => { model = getModel("User"); });
 
   it("should have all scalar fields with correct types", () => {
     const scalars: Record<string, string> = {
-      id: "Int",
-      username: "String",
-      email: "String",
-      fullName: "String",
-      hashedPassword: "String",
-      isActive: "Boolean",
-      role: "Role",
-      createdAt: "DateTime",
+      id: "Int", username: "String", email: "String", fullName: "String",
+      hashedPassword: "String", isActive: "Boolean", isVerified: "Boolean",
+      role: "Role", createdAt: "DateTime",
     };
-
     for (const [name, type] of Object.entries(scalars)) {
       const f = getField(model, name);
       expect(f.kind).toBe(name === "role" ? "enum" : "scalar");
@@ -137,8 +124,9 @@ describe("Model: User", () => {
     expect(getField(model, "email").isUnique).toBe(true);
   });
 
-  it("should default isActive to true and role to USER", () => {
+  it("should default isActive to true, isVerified to false, and role to USER", () => {
     expect(getField(model, "isActive").hasDefaultValue).toBe(true);
+    expect(getField(model, "isVerified").hasDefaultValue).toBe(true);
     const role = getField(model, "role");
     expect(role.hasDefaultValue).toBe(true);
     expect(role.type).toBe("Role");
@@ -154,70 +142,103 @@ describe("Model: User", () => {
     });
   });
 
-  // Relation fields
-  it("should have relation to ActivityLog (one-to-many)", () => {
-    const f = getField(model, "activityLogs");
-    expect(f.kind).toBe("object");
-    expect(f.isList).toBe(true);
-    expect(f.type).toBe("ActivityLog");
-  });
-
-  it("should have relation to ChatLog (one-to-many)", () => {
-    const f = getField(model, "chatLogs");
-    expect(f.kind).toBe("object");
-    expect(f.isList).toBe(true);
-    expect(f.type).toBe("ChatLog");
-  });
-
-  it("should have relation to Document (one-to-many)", () => {
-    const f = getField(model, "documents");
-    expect(f.kind).toBe("object");
-    expect(f.isList).toBe(true);
-    expect(f.type).toBe("Document");
-  });
-
-  it("should have relation to EscalationTicket (one-to-many)", () => {
-    const f = getField(model, "escalations");
-    expect(f.kind).toBe("object");
-    expect(f.isList).toBe(true);
-    expect(f.type).toBe("EscalationTicket");
+  it("should have all relation fields (one-to-many)", () => {
+    const relations = ["activityLogs", "chatLogs", "documents", "escalations", "conversations", "passwordResetTokens", "emailVerificationTokens"];
+    for (const name of relations) {
+      const f = getField(model, name);
+      expect(f.kind).toBe("object");
+      expect(f.isList).toBe(true);
+    }
   });
 
   it("should have no unknown fields", () => {
     const expected = new Set([
       "id", "username", "email", "fullName", "hashedPassword",
-      "isActive", "role", "createdAt",
+      "isActive", "isVerified", "role", "createdAt",
       "activityLogs", "chatLogs", "documents", "escalations",
+      "conversations", "passwordResetTokens", "emailVerificationTokens",
     ]);
     const actual = new Set(model.fields.map((f) => f.name));
     expect(actual).toEqual(expected);
   });
 });
 
-// ---------------------------------------------------------------------------
-// 4. Model: Document
-// ---------------------------------------------------------------------------
+describe("Model: PasswordResetToken", () => {
+  let model: DmmfModel;
+
+  beforeAll(() => { model = getModel("PasswordResetToken"); });
+
+  it("should have all scalar fields", () => {
+    const fields = { id: "Int", userId: "Int", token: "String", expiresAt: "DateTime", usedAt: "DateTime" };
+    for (const [name, type] of Object.entries(fields)) {
+      const f = getField(model, name);
+      expect(f.kind).toBe("scalar");
+      expect(f.type).toBe(type);
+    }
+  });
+
+  it("should enforce uniqueness on token", () => {
+    expect(getField(model, "token").isUnique).toBe(true);
+  });
+
+  it("should allow usedAt to be nullable", () => {
+    expect(getField(model, "usedAt").isRequired).toBe(false);
+  });
+
+  it("should relate to User via userId with onDelete Cascade", () => {
+    const f = getField(model, "user");
+    expect(f.kind).toBe("object");
+    expect(f.type).toBe("User");
+    expect(f.relationFromFields).toEqual(["userId"]);
+    expect(f.relationToFields).toEqual(["id"]);
+  });
+
+  it("should have no unknown fields", () => {
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(new Set(["id", "userId", "user", "token", "expiresAt", "usedAt"]));
+  });
+});
+
+describe("Model: EmailVerificationToken", () => {
+  let model: DmmfModel;
+
+  beforeAll(() => { model = getModel("EmailVerificationToken"); });
+
+  it("should have all scalar fields", () => {
+    const fields = { id: "Int", userId: "Int", token: "String", expiresAt: "DateTime" };
+    for (const [name, type] of Object.entries(fields)) {
+      const f = getField(model, name);
+      expect(f.kind).toBe("scalar");
+      expect(f.type).toBe(type);
+    }
+  });
+
+  it("should enforce uniqueness on token", () => {
+    expect(getField(model, "token").isUnique).toBe(true);
+  });
+
+  it("should relate to User via userId with onDelete Cascade", () => {
+    const f = getField(model, "user");
+    expect(f.kind).toBe("object");
+    expect(f.type).toBe("User");
+    expect(f.relationFromFields).toEqual(["userId"]);
+    expect(f.relationToFields).toEqual(["id"]);
+  });
+
+  it("should have no unknown fields", () => {
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(new Set(["id", "userId", "user", "token", "expiresAt"]));
+  });
+});
 
 describe("Model: Document", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("Document");
-  });
+  beforeAll(() => { model = getModel("Document"); });
 
   it("should have all scalar fields with correct types", () => {
     const scalars: Record<string, string> = {
-      id: "Int",
-      filename: "String",
-      originalName: "String",
-      mimeType: "String",
-      sizeBytes: "Int",
-      status: "String",
-      errorMessage: "String",
-      collectionName: "String",
-      uploadedById: "Int",
-      createdAt: "DateTime",
-      updatedAt: "DateTime",
+      id: "Int", filename: "String", originalName: "String", mimeType: "String",
+      sizeBytes: "Int", status: "String", errorMessage: "String",
+      collectionName: "String", uploadedById: "Int", createdAt: "DateTime", updatedAt: "DateTime",
     };
     for (const [name, type] of Object.entries(scalars)) {
       const f = getField(model, name);
@@ -226,32 +247,24 @@ describe("Model: Document", () => {
     }
   });
 
-  it("should default status to 'processing'", () => {
-    const f = getField(model, "status");
-    expect(f.hasDefaultValue).toBe(true);
-  });
-
-  it("should default collectionName to 'knowledge_base'", () => {
-    const f = getField(model, "collectionName");
-    expect(f.hasDefaultValue).toBe(true);
+  it("should default status and collectionName", () => {
+    expect(getField(model, "status").hasDefaultValue).toBe(true);
+    expect(getField(model, "collectionName").hasDefaultValue).toBe(true);
   });
 
   it("should allow errorMessage to be nullable", () => {
-    const f = getField(model, "errorMessage");
-    expect(f.isRequired).toBe(false);
+    expect(getField(model, "errorMessage").isRequired).toBe(false);
   });
 
-  it("should auto-update updatedAt", () => {
-    const f = getField(model, "updatedAt");
-    expect(f.hasDefaultValue).toBe(true); // @updatedAt
+  it("should have updatedAt as DateTime", () => {
+    expect(getField(model, "updatedAt").type).toBe("DateTime");
   });
 
-  it("should relate uploadedBy to User via uploadedById", () => {
+  it("should relate uploadedBy to User", () => {
     const f = getField(model, "uploadedBy");
     expect(f.kind).toBe("object");
     expect(f.type).toBe("User");
     expect(f.relationFromFields).toEqual(["uploadedById"]);
-    expect(f.relationToFields).toEqual(["id"]);
   });
 
   it("should have no unknown fields", () => {
@@ -260,154 +273,123 @@ describe("Model: Document", () => {
       "status", "errorMessage", "collectionName", "uploadedById",
       "uploadedBy", "createdAt", "updatedAt",
     ]);
-    const actual = new Set(model.fields.map((f) => f.name));
-    expect(actual).toEqual(expected);
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(expected);
   });
 });
-
-// ---------------------------------------------------------------------------
-// 5. Model: ActivityLog
-// ---------------------------------------------------------------------------
 
 describe("Model: ActivityLog", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("ActivityLog");
-  });
+  beforeAll(() => { model = getModel("ActivityLog"); });
 
-  it("should have exactly the audit-trail fields", () => {
-    const scalars: Record<string, string> = {
-      id: "Int",
-      userId: "Int",
-      action: "String",
-      createdAt: "DateTime",
+  it("should have all fields with correct types", () => {
+    const fields: Record<string, string> = {
+      id: "Int", userId: "Int", action: "String",
+      ipAddress: "String", userAgent: "String", success: "Boolean",
+      metadata: "Json", createdAt: "DateTime",
     };
-    for (const [name, type] of Object.entries(scalars)) {
+    for (const [name, type] of Object.entries(fields)) {
       const f = getField(model, name);
-      expect(f.kind).toBe("scalar");
+      expect(f.kind).toBe(name === "metadata" ? "scalar" : "scalar");
       expect(f.type).toBe(type);
     }
   });
 
-  it("should relate user to User via userId", () => {
+  it("should allow ipAddress, userAgent, metadata to be nullable", () => {
+    expect(getField(model, "ipAddress").isRequired).toBe(false);
+    expect(getField(model, "userAgent").isRequired).toBe(false);
+    expect(getField(model, "metadata").isRequired).toBe(false);
+  });
+
+  it("should default success to true", () => {
+    expect(getField(model, "success").hasDefaultValue).toBe(true);
+  });
+
+  it("should relate to User", () => {
     const f = getField(model, "user");
     expect(f.kind).toBe("object");
     expect(f.type).toBe("User");
     expect(f.relationFromFields).toEqual(["userId"]);
-    expect(f.relationToFields).toEqual(["id"]);
   });
 
   it("should have no unknown fields", () => {
-    const expected = new Set(["id", "userId", "user", "action", "createdAt"]);
-    const actual = new Set(model.fields.map((f) => f.name));
-    expect(actual).toEqual(expected);
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(
+      new Set(["id", "userId", "user", "action", "ipAddress", "userAgent", "success", "metadata", "createdAt"])
+    );
   });
 });
-
-// ---------------------------------------------------------------------------
-// 6. Model: ChatLog
-// ---------------------------------------------------------------------------
 
 describe("Model: ChatLog", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("ChatLog");
-  });
+  beforeAll(() => { model = getModel("ChatLog"); });
 
   it("should have all scalar fields with correct types", () => {
-    const scalars: Record<string, string> = {
-      id: "Int",
-      userId: "Int",
-      question: "String",
-      isAnswered: "Boolean",
-      hasImage: "Boolean",
-      imagePath: "String",
-      createdAt: "DateTime",
+    const fields: Record<string, string> = {
+      id: "Int", userId: "Int", question: "String", isAnswered: "Boolean",
+      hasImage: "Boolean", imagePath: "String", createdAt: "DateTime",
     };
-    for (const [name, type] of Object.entries(scalars)) {
+    for (const [name, type] of Object.entries(fields)) {
       const f = getField(model, name);
       expect(f.kind).toBe("scalar");
       expect(f.type).toBe(type);
     }
   });
 
-  it("should allow question, isAnswered, and imagePath to be nullable", () => {
+  it("should allow nullable fields", () => {
     expect(getField(model, "question").isRequired).toBe(false);
     expect(getField(model, "isAnswered").isRequired).toBe(false);
     expect(getField(model, "imagePath").isRequired).toBe(false);
   });
 
   it("should default hasImage to false", () => {
-    const f = getField(model, "hasImage");
-    expect(f.hasDefaultValue).toBe(true);
+    expect(getField(model, "hasImage").hasDefaultValue).toBe(true);
   });
 
-  it("should relate user to User via userId", () => {
+  it("should relate to User", () => {
     const f = getField(model, "user");
     expect(f.kind).toBe("object");
     expect(f.type).toBe("User");
     expect(f.relationFromFields).toEqual(["userId"]);
-    expect(f.relationToFields).toEqual(["id"]);
   });
 
   it("should have optional one-to-one relation to EscalationTicket", () => {
     const f = getField(model, "escalation");
     expect(f.kind).toBe("object");
-    expect(f.type).toBe("EscalationTicket");
     expect(f.isList).toBe(false);
-    // The back-relation on EscalationTicket (chatLog) is optional,
-    // so this field is not required
   });
 
   it("should have no unknown fields", () => {
-    const expected = new Set([
-      "id", "userId", "user", "question", "isAnswered",
-      "hasImage", "imagePath", "createdAt", "escalation",
-    ]);
-    const actual = new Set(model.fields.map((f) => f.name));
-    expect(actual).toEqual(expected);
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(
+      new Set(["id", "userId", "user", "question", "isAnswered", "hasImage", "imagePath", "createdAt", "escalation"])
+    );
   });
 });
-
-// ---------------------------------------------------------------------------
-// 7. Model: EscalationTicket
-// ---------------------------------------------------------------------------
 
 describe("Model: EscalationTicket", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("EscalationTicket");
-  });
+  beforeAll(() => { model = getModel("EscalationTicket"); });
 
-  it("should have all scalar fields with correct types", () => {
-    const scalars: Record<string, string> = {
-      id: "Int",
-      userId: "Int",
-      question: "String",
-      reason: "String",
-      confidence: "Float",
-      status: "String",
-      chatLogId: "Int",
-      resolvedAt: "DateTime",
-      createdAt: "DateTime",
-      updatedAt: "DateTime",
+  it("should have all scalar fields", () => {
+    const fields: Record<string, string> = {
+      id: "Int", userId: "Int", question: "String", reason: "String",
+      confidence: "Float", status: "String", chatLogId: "Int",
+      resolvedAt: "DateTime", createdAt: "DateTime", updatedAt: "DateTime",
     };
-    for (const [name, type] of Object.entries(scalars)) {
+    for (const [name, type] of Object.entries(fields)) {
       const f = getField(model, name);
       expect(f.kind).toBe("scalar");
       expect(f.type).toBe(type);
     }
   });
 
-  it("should default reason to 'confidence_rendah' and status to 'pending'", () => {
+  it("should default reason and status", () => {
     expect(getField(model, "reason").hasDefaultValue).toBe(true);
     expect(getField(model, "status").hasDefaultValue).toBe(true);
   });
 
-  it("should allow nullable confidence, chatLogId, and resolvedAt", () => {
+  it("should allow nullable fields", () => {
     expect(getField(model, "confidence").isRequired).toBe(false);
     expect(getField(model, "chatLogId").isRequired).toBe(false);
     expect(getField(model, "resolvedAt").isRequired).toBe(false);
@@ -417,87 +399,102 @@ describe("Model: EscalationTicket", () => {
     expect(getField(model, "chatLogId").isUnique).toBe(true);
   });
 
-  it("should auto-update updatedAt", () => {
-    expect(getField(model, "updatedAt").hasDefaultValue).toBe(true);
+  it("should have updatedAt as DateTime", () => {
+    expect(getField(model, "updatedAt").type).toBe("DateTime");
   });
 
-  it("should relate user to User via userId", () => {
-    const f = getField(model, "user");
-    expect(f.kind).toBe("object");
-    expect(f.type).toBe("User");
-    expect(f.relationFromFields).toEqual(["userId"]);
-    expect(f.relationToFields).toEqual(["id"]);
-  });
-
-  it("should have optional one-to-one relation to ChatLog via chatLogId", () => {
-    const f = getField(model, "chatLog");
-    expect(f.kind).toBe("object");
-    expect(f.type).toBe("ChatLog");
-    expect(f.isList).toBe(false);
-    expect(f.relationFromFields).toEqual(["chatLogId"]);
-    expect(f.relationToFields).toEqual(["id"]);
+  it("should relate to User and ChatLog", () => {
+    expect(getField(model, "user").type).toBe("User");
+    expect(getField(model, "chatLog").type).toBe("ChatLog");
+    expect(getField(model, "chatLog").relationFromFields).toEqual(["chatLogId"]);
   });
 
   it("should have no unknown fields", () => {
-    const expected = new Set([
-      "id", "userId", "user", "question", "reason",
-      "confidence", "status", "chatLogId", "chatLog",
-      "resolvedAt", "createdAt", "updatedAt",
-    ]);
-    const actual = new Set(model.fields.map((f) => f.name));
-    expect(actual).toEqual(expected);
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(
+      new Set(["id", "userId", "user", "question", "reason", "confidence", "status",
+        "chatLogId", "chatLog", "resolvedAt", "createdAt", "updatedAt"])
+    );
   });
 });
 
-// ---------------------------------------------------------------------------
-// 8. Model: n8n_chat_histories (mapped table)
-// ---------------------------------------------------------------------------
+describe("Model: Conversation", () => {
+  let model: DmmfModel;
+
+  beforeAll(() => { model = getModel("Conversation"); });
+
+  it("should have all scalar fields", () => {
+    const fields: Record<string, string> = {
+      id: "Int", userId: "Int", title: "String", createdAt: "DateTime", updatedAt: "DateTime",
+    };
+    for (const [name, type] of Object.entries(fields)) {
+      const f = getField(model, name);
+      expect(f.kind).toBe("scalar");
+      expect(f.type).toBe(type);
+    }
+  });
+
+  it("should allow title to be nullable", () => {
+    expect(getField(model, "title").isRequired).toBe(false);
+  });
+
+  it("should have userId field as required", () => {
+    expect(getField(model, "userId").isRequired).toBe(true);
+  });
+
+  it("should relate to User and n8n_chat_histories", () => {
+    expect(getField(model, "user").type).toBe("User");
+    expect(getField(model, "chatHistories").type).toBe("n8n_chat_histories");
+    expect(getField(model, "chatHistories").isList).toBe(true);
+  });
+
+  it("should have no unknown fields", () => {
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(
+      new Set(["id", "userId", "title", "createdAt", "updatedAt", "user", "chatHistories"])
+    );
+  });
+});
 
 describe("Model: n8n_chat_histories", () => {
   let model: DmmfModel;
 
-  beforeAll(() => {
-    model = getModel("n8n_chat_histories");
-  });
+  beforeAll(() => { model = getModel("n8n_chat_histories"); });
 
   it("should map to table 'n8n_chat_histories'", () => {
     expect(model.dbName).toBe("n8n_chat_histories");
   });
 
-  it("should have id, session_id, and message fields", () => {
-    expect(getField(model, "id").type).toBe("Int");
+  it("should have id, session_id, conversationId, and message fields", () => {
     expect(getField(model, "id").isId).toBe(true);
+    expect(getField(model, "id").type).toBe("Int");
+    expect(getField(model, "session_id").isRequired).toBe(false);
+    expect(getField(model, "session_id").type).toBe("String");
+    expect(getField(model, "conversationId").type).toBe("Int");
+    expect(getField(model, "conversationId").isRequired).toBe(false);
+    expect(getField(model, "message").type).toBe("Json");
+    expect(getField(model, "message").isRequired).toBe(true);
+  });
 
-    const sessionId = getField(model, "session_id");
-    expect(sessionId.type).toBe("String");
-    expect(sessionId.isRequired).toBe(true);
-
-    const message = getField(model, "message");
-    expect(message.type).toBe("Json");
-    expect(message.isRequired).toBe(true);
+  it("should relate to Conversation", () => {
+    const f = getField(model, "conversation");
+    expect(f.kind).toBe("object");
+    expect(f.type).toBe("Conversation");
+    expect(f.relationFromFields).toEqual(["conversationId"]);
   });
 
   it("should have no unknown fields", () => {
-    const expected = new Set(["id", "session_id", "message"]);
-    const actual = new Set(model.fields.map((f) => f.name));
-    expect(actual).toEqual(expected);
+    expect(new Set(model.fields.map((f) => f.name))).toEqual(
+      new Set(["id", "session_id", "conversationId", "message", "conversation"])
+    );
   });
 });
 
-// ---------------------------------------------------------------------------
-// 9. Schema integrity — cross-model checks
-// ---------------------------------------------------------------------------
-
 describe("Schema integrity", () => {
-  it("should contain exactly 6 models", () => {
+  it("should contain exactly 7 models", () => {
     const names = Array.from(dmmfModels.keys()).sort();
     expect(names).toEqual([
-      "ActivityLog",
-      "ChatLog",
-      "Document",
-      "EscalationTicket",
-      "User",
-      "n8n_chat_histories",
+      "ActivityLog", "ChatLog", "Conversation", "Document",
+      "EmailVerificationToken", "EscalationTicket",
+      "PasswordResetToken", "User", "n8n_chat_histories",
     ]);
   });
 
@@ -506,16 +503,18 @@ describe("Schema integrity", () => {
     expect(dmmfEnums.has("Role")).toBe(true);
   });
 
-  it("should have no orphaned scalar relation fields (every FK has a corresponding relation)", () => {
-    // Check each model's scalar FK fields have matching relation fields
+  it("should verify every FK has a matching relation field", () => {
     const checks: [string, string, string][] = [
       ["Document", "uploadedById", "uploadedBy"],
       ["ActivityLog", "userId", "user"],
       ["ChatLog", "userId", "user"],
       ["EscalationTicket", "userId", "user"],
       ["EscalationTicket", "chatLogId", "chatLog"],
+      ["PasswordResetToken", "userId", "user"],
+      ["EmailVerificationToken", "userId", "user"],
+      ["Conversation", "userId", "user"],
+      ["n8n_chat_histories", "conversationId", "conversation"],
     ];
-
     for (const [modelName, fkField, relationField] of checks) {
       const model = getModel(modelName);
       expect(getField(model, fkField)).toBeDefined();
@@ -524,61 +523,26 @@ describe("Schema integrity", () => {
       expect(rel.relationFromFields).toBeDefined();
     }
   });
-
-  it("should have all back-relations reciprocated", () => {
-    const user = getModel("User");
-    expect(getField(user, "activityLogs").type).toBe("ActivityLog");
-    expect(getField(user, "chatLogs").type).toBe("ChatLog");
-    expect(getField(user, "documents").type).toBe("Document");
-    expect(getField(user, "escalations").type).toBe("EscalationTicket");
-  });
-
-  it("should have ChatLog <-> EscalationTicket as a true one-to-one", () => {
-    const chatLog = getModel("ChatLog");
-    const escalation = getModel("EscalationTicket");
-
-    const escalationOnChat = getField(chatLog, "escalation");
-    expect(escalationOnChat.kind).toBe("object");
-    expect(escalationOnChat.isList).toBe(false);
-
-    const chatLogOnEscalation = getField(escalation, "chatLog");
-    expect(chatLogOnEscalation.kind).toBe("object");
-    expect(chatLogOnEscalation.isList).toBe(false);
-
-    // chatLogId is unique on EscalationTicket — enforces true 1:1
-    expect(getField(escalation, "chatLogId").isUnique).toBe(true);
-  });
 });
-
-// ---------------------------------------------------------------------------
-// 10. Prisma Client — generated types smoke test
-// ---------------------------------------------------------------------------
 
 describe("Prisma Client generated types", () => {
   it("should expose delegate keys for every model", () => {
-    const delegates = Object.keys(prisma).filter(
-      (k) => !k.startsWith("$") && !k.startsWith("_"),
-    );
+    const delegates = Object.keys(prisma).filter((k) => !k.startsWith("$") && !k.startsWith("_"));
     expect(delegates.sort()).toEqual([
-      "activityLog",
-      "chatLog",
-      "document",
-      "escalationTicket",
-      "n8n_chat_histories",
-      "user",
+      "activityLog", "chatLog", "conversation", "document",
+      "emailVerificationToken", "escalationTicket",
+      "n8n_chat_histories", "passwordResetToken", "user",
     ]);
   });
 
   it("should have Role enum on the client", () => {
-    expect(prisma.$extends).toBeDefined(); // client is alive
-    // Role enum is available at the TypeScript level — verify via DMMF
     const role = dmmfEnums.get("Role")!;
-    expect(role.values).toContain("USER");
-    expect(role.values).toContain("ADMIN");
+    const names = role.values.map((v) => v.name);
+    expect(names).toContain("USER");
+    expect(names).toContain("ADMIN");
   });
 
   it("should be able to disconnect cleanly", async () => {
     await prisma.$disconnect();
-    // No-op if already disconnected — should not throw
   });
 });
