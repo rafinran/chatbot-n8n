@@ -111,7 +111,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo '🐳 Building Docker images...'
-                sh """rsync -av --delete --exclude='.git' --exclude='node_modules' --exclude='rag/qdrant_storage' --exclude='rag/ollama' --exclude='rag/n8n_data' --exclude='backend/uploads' . ${APP_DIR}/"""
+                sh """rsync -av --exclude='.git' --exclude='node_modules' --exclude='rag/qdrant_storage' --exclude='rag/ollama' --exclude='rag/n8n_data' --exclude='backend/uploads' --exclude='backend/dist' --exclude='frontend/.next' . ${APP_DIR}/"""
                 sh """cd ${APP_DIR} && docker compose -f ${COMPOSE_BASE} -f ${COMPOSE_PROD} build --no-cache"""
             }
         }
