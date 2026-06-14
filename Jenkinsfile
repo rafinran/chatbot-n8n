@@ -1,11 +1,16 @@
 pipeline {
     agent any
 
+    triggers {
+        githubPush()
+      }
+
     environment {
         APP_DIR       = '/home/rafinran/chatbot-n8n'
-        COMPOSE_FILE  = "${APP_DIR}/docker-compose.yaml"
+        COMPOSE_BASE  = "${APP_DIR}/docker-compose.yaml"
+        COMPOSE_PROD  = "${APP_DIR}/docker-compose.prod.yaml"
         HEALTH_URL    = 'http://localhost/api/health'
-        PATH         = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+        PATH          = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
     }
 
     options {
@@ -90,10 +95,8 @@ pipeline {
         stage('Build') {
             steps {
                 echo '🐳 Building Docker images...'
-                sh """
-                    cp -r . ${APP_DIR}
-                    docker compose -f ${COMPOSE_FILE} build --no-cache
-                """
+                sh """rsync -av --delete --exclude='.git' --exclude='node_modules' --exclude='rag/qdrant_storage' --exclude='rag/ollama' --exclude='rag/n8n_data' --exclude='backend/uploads' . ${APP_DIR}/"""
+                sh """cd ${APP_DIR} && docker compose -f ${COMPOSE_BASE} -f ${COMPOSE_PROD} build --no-cache"""
             }
         }
 
@@ -103,8 +106,8 @@ pipeline {
                 echo '🚀 Deploying...'
                 sh """
                     cd ${APP_DIR}
-                    docker compose -f ${COMPOSE_FILE} down --remove-orphans
-                    docker compose -f ${COMPOSE_FILE} up -d
+                    docker compose -f ${COMPOSE_BASE} -f ${COMPOSE_PROD} down --remove-orphans
+                    docker compose -f ${COMPOSE_BASE} -f ${COMPOSE_PROD} up -d
                 """
             }
         }
