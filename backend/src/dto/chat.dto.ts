@@ -8,6 +8,7 @@ export interface SendMessageDto {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
 }
 
 export interface N8nRequestDto {
@@ -25,6 +26,7 @@ export interface ChatResponseDto {
   response: string;
   is_answered: boolean;
   conversationId: number;
+  imageUrl?: string;
 }
 
 export const SendMessageSchema = z.object({

@@ -12,18 +12,14 @@ import {
   Lock,
   Mail,
   User,
+  CheckCircle,
 } from "lucide-react";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { register } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { login: setUser } = useAuth();
-  
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -31,6 +27,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,9 +35,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const user = await register(username, email, fullName, password);
-      setUser(user);
-      router.push("/");
+      await register(username, email, fullName, password);
+      setDone(true);
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -84,6 +80,25 @@ export default function RegisterPage() {
               </Link>
             </div>
 
+            {done ? (
+              <div className="mt-2 text-center py-8">
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
+                    <CheckCircle size={32} className="text-emerald-500" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Registrasi Berhasil!</h2>
+                <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+                  Cek email <strong>{email}</strong> untuk verifikasi akun Anda sebelum login.
+                </p>
+                <Link href="/login">
+                  <Button className="mt-6 h-12 w-full rounded-xl bg-[#0a2a8b] hover:bg-[#09206b]">
+                    Ke Halaman Login
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <>
             <div className="mt-2">
               <h2 className="text-3xl font-bold">
                 Create your account
@@ -209,6 +224,8 @@ export default function RegisterPage() {
                 </Button>
               </Link>
             </form>
+              </>
+            )}
           </div>
         </div>
       </Card>

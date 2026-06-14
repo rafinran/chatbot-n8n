@@ -18,3 +18,9 @@ export async function updateUserRole(id: number, role: "USER" | "ADMIN") {
   if (!user) throw { status: 404, message: "User tidak ditemukan." };
   return prisma.user.update({ where: { id }, data: { role } });
 }
+
+export async function deleteUser(id: number) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw { status: 404, message: "User tidak ditemukan." };
+  await prisma.user.delete({ where: { id } });
+}

@@ -33,3 +33,14 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response): 
   await adminUserService.updateUserRole(id, parsed.data.role);
   res.json({ message: "Role user diperbarui." });
 });
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) return res.status(400).json({ error: "ID tidak valid." });
+
+  const userId = req.user.id;
+  if (id === userId) return res.status(400).json({ error: "Tidak bisa menghapus akun sendiri." });
+
+  await adminUserService.deleteUser(id);
+  res.json({ message: "User berhasil dihapus." });
+});

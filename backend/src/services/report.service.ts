@@ -76,19 +76,20 @@ async function queryReportData(from: Date, to: Date) {
 
 // ── Step 2: AI Clustering ──────────────────────────────────────
 
-async function clusterWithOpenRouter(questions: string[]): Promise<ClusterResult> {
+async function clusterWithAI(questions: string[]): Promise<ClusterResult> {
   if (questions.length === 0) {
     return { clusters: [], narrative: "Tidak ada pertanyaan yang masuk pada periode ini." };
   }
 
   const prompt = `Kamu adalah analis data helpdesk. Berikut adalah daftar pertanyaan yang masuk ke chatbot helpdesk Epson:\n\n${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\nTugasmu:\n1. Kelompokkan pertanyaan-pertanyaan di atas menjadi 3-7 topik/kategori utama.\n2. Hitung berapa banyak pertanyaan per kategori.\n3. Berikan 2-3 contoh pertanyaan representatif per kategori.\n4. Tulis narasi singkat (2-3 kalimat) tentang tren pertanyaan yang paling menonjol.\n\nBalas HANYA dalam format JSON berikut, tanpa markdown, tanpa penjelasan tambahan:\n{\n  "clusters": [\n    {\n      "topic": "nama kategori",\n      "count": jumlah,\n      "examples": ["contoh 1", "contoh 2"]\n    }\n  ],\n  "narrative": "narasi singkat di sini"\n}`;
 
+  // Primary: OpenCode DeepSeek V4 Flash
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await fetch("https://api.opencode.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${env.openRouterApiKey}`,
+        "Authorization": `Bearer ${env.opencodeApiKey}`,
       },
       body: JSON.stringify({
         model: "deepseek/deepseek-v4-flash",
@@ -97,18 +98,45 @@ async function clusterWithOpenRouter(questions: string[]): Promise<ClusterResult
       }),
     });
 
-    if (!res.ok) throw new Error(`OpenRouter error: ${res.status}`);
+    if (!res.ok) throw new Error(`OpenCode error: ${res.status}`);
 
     const data = await res.json() as any;
     const text = (data.choices?.[0]?.message?.content ?? "").replace(/```json|```/g, "").trim();
     return JSON.parse(text) as ClusterResult;
   } catch (err) {
-    console.warn("[REPORT] OpenRouter failed:", err);
-    return {
-      clusters: [{ topic: "Pertanyaan Umum", count: questions.length, examples: questions.slice(0, 3) }],
-      narrative: "Analisis AI tidak tersedia saat ini.",
-    };
+    console.warn("[REPORT] OpenCode failed, trying OpenRouter fallback:", err);
   }
+
+  // Fallback: OpenRouter Qwen 3.5 Flash
+  if (env.openRouterApiKey) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${env.openRouterApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "qwen/qwen3.5-flash-02-23",
+          temperature: 0.1,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      if (!res.ok) throw new Error(`OpenRouter error: ${res.status}`);
+
+      const data = await res.json() as any;
+      const text = (data.choices?.[0]?.message?.content ?? "").replace(/```json|```/g, "").trim();
+      return JSON.parse(text) as ClusterResult;
+    } catch (err2) {
+      console.warn("[REPORT] OpenRouter fallback also failed:", err2);
+    }
+  }
+
+  return {
+    clusters: [{ topic: "Pertanyaan Umum", count: questions.length, examples: questions.slice(0, 3) }],
+    narrative: "Analisis AI tidak tersedia saat ini.",
+  };
 }
 
 // ── Step 3: Build HTML Email ───────────────────────────────────────────────
@@ -269,8 +297,8 @@ export async function generateAndSendReport(type: "daily" | "weekly"): Promise<{
   const data = await queryReportData(range.from, range.to);
 
   const [clustering, unansweredClustering] = await Promise.all([
-    clusterWithOpenRouter(data.allQuestions),
-    clusterWithOpenRouter(data.unansweredQuestions),
+    clusterWithAI(data.allQuestions),
+    clusterWithAI(data.unansweredQuestions),
   ]);
 
   const html = buildEmailHtml({

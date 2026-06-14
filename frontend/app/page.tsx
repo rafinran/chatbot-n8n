@@ -250,9 +250,7 @@ export default function HomePage() {
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" className="mt-0.5 flex-shrink-0" />
                 <p>
-                  Opt-in for promotional emails regarding my relationship,
-                  I agree that I will be contacted in accordance with the
-                  Privacy Policy.
+                  Ini dummy, gak usah diisi ദ്ദി ( ᵔ ᗜ ᵔ ).
                 </p>
               </div>
               <Button className="bg-[#0A2A8B] hover:bg-[#081f66] w-full sm:w-auto">

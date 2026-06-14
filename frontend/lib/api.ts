@@ -59,17 +59,17 @@ export async function getCurrentUser() {
 //   });
 // }
 
-export async function sendMessage(payload: string | FormData) {
+export async function sendMessage(payload: string | FormData | { message: string; conversationId?: number }) {
   const isFormData = payload instanceof FormData;
+  const isObject = !isFormData && typeof payload === "object" && payload !== null;
 
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
-    // kalau FormData, JANGAN set Content-Type — browser otomatis set boundary-nya
-    headers: isFormData 
-      ? { credentials: "include" } as any
+    headers: isFormData
+      ? ({ credentials: "include" } as any)
       : { "Content-Type": "application/json" },
     credentials: "include",
-    body: isFormData ? payload : JSON.stringify({ message: payload }),
+    body: isFormData ? payload : JSON.stringify(isObject ? payload : { message: payload }),
   });
 
   if (!response.ok) {
@@ -154,6 +154,10 @@ export async function updateUserRole(id: number, role: "USER" | "ADMIN") {
   });
 }
 
+export async function deleteUser(id: number) {
+  return apiCall(`/admin/users/${id}`, { method: "DELETE" });
+}
+
 // Report endpoints
 export async function sendReport(type: "daily" | "weekly") {
   return apiCall(`/reports/send?type=${type}`, { method: "POST" });
@@ -216,5 +220,42 @@ export async function replyEscalation(id: number, message: string) {
   return apiCall(`/admin/escalations/${id}/reply`, {
     method: "POST",
     body: JSON.stringify({ message }),
+  });
+}
+
+export async function escalateChat(question: string) {
+  return apiCall("/chat/escalate", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+}
+
+// Password reset
+export async function forgotPassword(email: string) {
+  return apiCall("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  return apiCall("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
+// Email verification
+export async function verifyEmail(token: string) {
+  return apiCall("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function resendVerificationEmail(email: string) {
+  return apiCall("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
   });
 }

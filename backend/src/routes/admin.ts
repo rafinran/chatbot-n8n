@@ -42,6 +42,7 @@ router.patch("/documents/:id/status", adminController.updateDocumentStatus);
 router.get("/users",              requireAuth, requireAdmin, adminUserController.getUsers);
 router.patch("/users/:id/status", requireAuth, requireAdmin, adminUserController.toggleUserStatus);
 router.patch("/users/:id/role",   requireAuth, requireAdmin, adminUserController.updateUserRole);
+router.delete("/users/:id",       requireAuth, requireAdmin, adminUserController.deleteUser);
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 router.get("/overview/stats",       requireAuth, requireAdmin, overviewController.getStats);

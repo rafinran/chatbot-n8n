@@ -150,6 +150,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div className="text-right">
+                <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-[#0a2a8b] transition">
+                  Lupa password?
+                </Link>
+              </div>
+
               {/* LOGIN BUTTON */}
               <Button 
                 type="submit"

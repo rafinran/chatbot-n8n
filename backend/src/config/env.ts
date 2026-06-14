@@ -10,6 +10,7 @@ export const env = {
   jwtSecret:      required("JWT_SECRET"),
   frontendUrl:    process.env.FRONTEND_URL || "http://localhost:80",
   googleApiKey:   required("GOOGLE_API_KEY"),
+  opencodeApiKey: required("OPENCODE_API_KEY"),
   n8nWebhookUrl:  required("N8N_WEBHOOK_URL"),
   indexerUrl:     process.env.INDEXER_URL || "http://indexer:5000",
   indexerSecret:  required("INDEXER_SECRET"),

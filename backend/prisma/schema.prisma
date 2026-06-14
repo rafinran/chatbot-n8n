@@ -13,19 +13,39 @@ enum Role {
 }
 
 model User {
-  id             Int                @id @default(autoincrement())
-  username       String             @unique
-  email          String             @unique
-  fullName       String
-  hashedPassword String
-  isActive       Boolean            @default(true)
-  role           Role               @default(USER)
-  createdAt      DateTime           @default(now())
-  activityLogs   ActivityLog[]
-  chatLogs       ChatLog[]
-  documents      Document[]
-  escalations    EscalationTicket[]
-  conversations  Conversation[]
+  id                         Int                         @id @default(autoincrement())
+  username                   String                      @unique
+  email                      String                      @unique
+  fullName                   String
+  hashedPassword             String
+  isActive                   Boolean                     @default(true)
+  isVerified                 Boolean                     @default(false)
+  role                       Role                        @default(USER)
+  createdAt                  DateTime                    @default(now())
+  activityLogs               ActivityLog[]
+  chatLogs                   ChatLog[]
+  documents                  Document[]
+  escalations                EscalationTicket[]
+  conversations              Conversation[]
+  passwordResetTokens        PasswordResetToken[]
+  emailVerificationTokens    EmailVerificationToken[]
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailVerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Document {
@@ -38,17 +58,23 @@ model Document {
   errorMessage   String?
   collectionName String   @default("knowledge_base")
   uploadedById   Int
-  uploadedBy     User     @relation(fields: [uploadedById], references: [id])
+  uploadedBy     User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
 
 // Audit trail murni: login, logout, dsb.
 model ActivityLog {
+  // Audit trail: login, logout, register, upload_doc, etc
+  // Tracks IP, user agent, and success/failure
   id        Int      @id @default(autoincrement())
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  action    String   // login | logout
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // login | logout | register | upload_doc | off_topic | etc
+  ipAddress  String?  // X-Forwarded-For or req.ip
+  userAgent  String?  // Browser user agent
+  success    Boolean  @default(true)  // login success/failure
+  metadata   Json?    // Extra data like documentId, etc
   createdAt DateTime @default(now())
 }
 
@@ -56,7 +82,7 @@ model ActivityLog {
 model ChatLog {
   id         Int               @id @default(autoincrement())
   userId     Int
-  user       User              @relation(fields: [userId], references: [id])
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   question   String?
   isAnswered Boolean?
   hasImage   Boolean           @default(false)
@@ -68,7 +94,7 @@ model ChatLog {
 model EscalationTicket {
   id         Int       @id @default(autoincrement())
   userId     Int
-  user       User      @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   question   String
   reason     String    @default("confidence_rendah")
   confidence Float?
@@ -93,10 +119,11 @@ model Conversation {
 }
 
 model n8n_chat_histories {
-  id              Int    @id @default(autoincrement())
-  conversationId  Int
+  id              Int           @id @default(autoincrement())
+  session_id      String?       @db.VarChar(255)
+  conversationId  Int?
   message         Json
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@map("n8n_chat_histories")
 }

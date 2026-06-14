@@ -58,8 +58,9 @@ Chatbot helpdesk internal berbasis **Retrieval Augmented Generation (RAG)** untu
 ## Prasyarat
 
 - Docker & Docker Compose v2
-- **Google Gemini API Key** (wajib) → [aistudio.google.com](https://aistudio.google.com/app/apikey)
-- **OpenRouter API Key** *(opsional)* → [openrouter.ai](https://openrouter.ai)
+- **Google Gemini API Key** (wajib, untuk embedding) → [aistudio.google.com](https://aistudio.google.com/app/apikey)
+- **OpenCode API Key** (wajib, untuk LLM text & image) → [opencode.ai](https://opencode.ai)
+- **OpenRouter API Key** *(opsional, fallback)* → [openrouter.ai](https://openrouter.ai)
 - **Resend API Key** *(opsional, untuk email report)* → [resend.com](https://resend.com)
 ---
 
@@ -68,7 +69,7 @@ Chatbot helpdesk internal berbasis **Retrieval Augmented Generation (RAG)** untu
 ```bash
 # 1. Clone & setup env
 git clone https://github.com/rafinran/chatbot-n8n && cd chatbot-n8n
-mv .env.example .env   # isi minimal: GOOGLE_API_KEY, JWT_SECRET, ADMIN_PWD
+mv .env.example .env   # isi minimal: GOOGLE_API_KEY, OPENCODE_API_KEY, JWT_SECRET, ADMIN_PWD
 
 # 2. Jalankan semua service
 docker compose up --build -d
@@ -81,7 +82,7 @@ docker exec helpdesk-backend npx prisma db seed
 **Import workflow n8n:**
 
 1. Buka `http://localhost:5678` (SSH tunnel jika port tertutup)
-2. Buat credential: Qdrant (`http://qdrant:6333`), PostgreSQL (host `db`), Google Gemini, OpenRouter
+2. Buat credential: Qdrant (`http://qdrant:6333`), PostgreSQL (host `db`), OpenCode (OpenAI-compatible, `https://api.opencode.ai/v1`), OpenRouter (fallback), Google Gemini (embedding)
 3. Import `rag/chatbot.json` → aktifkan workflow
 4. Salin production webhook URL → update `N8N_WEBHOOK_URL` di `.env` → `docker compose restart backend`
 
@@ -108,6 +109,7 @@ N8N_WEBHOOK_URL=http://n8n:5678/webhook/rag
 INDEXER_URL=http://indexer:5000
 
 GOOGLE_API_KEY=AIzxxxxxxxxxxxxxxxxxxxxxxxx
+OPENCODE_API_KEY=oc-xxxxxxxxxxxxxxxxxxxxxxxxx
 OPENROUTER_API_KEY=sk-or-xxxxxxxxxxxxxxxxx
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 REPORT_RECIPIENT=contohemail@gmail.com
@@ -134,10 +136,10 @@ Login default: `admin` / `<ADMIN_PWD dari .env>`
 
 | Komponen        | Model / Library                                                          |
 |-----------------|--------------------------------------------------------------------------|
-| LLM utama       | `models/gemini-3.1-flash-lite` via Google Gemini (n8n)                   |
-| LLM fallback    | OpenRouter (`deepseek/deepseek-v4-flash`)                                |
+| LLM utama       | `deepseek/deepseek-v4-flash` via OpenCode (OpenAI-compatible)            |
+| LLM fallback    | `qwen/qwen3.5-flash-02-23` via OpenRouter                                |
 | Embedding       | `models/gemini-embedding-2` (vektor dimensi 3072, Cosine similarity)     |
-| Analisis gambar | `gemini-3.1-flash` → fallback `qwen/qwen3.5-flash-02-23` via OpenRouter  |
+| Analisis gambar | `minimax/M3` via OpenCode → fallback `qwen/qwen3.5-flash-02-23` via OpenRouter |
 | Chunking        | `RecursiveCharacterTextSplitter` (1000 chars, overlap 150)                |
 
 ---
