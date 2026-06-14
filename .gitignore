@@ -35,8 +35,8 @@ rag/n8n_data/*
 rag/ollama/*
 rag/qdrant_storage/*
 *.tsbuildinfo
-*.d.ts
-*.d.js
+dist/**/*.d.ts
+dist/**/*.d.js
 *.ts.map
 *.js.map
 
