@@ -37,6 +37,8 @@ rag/qdrant_storage/*
 *.tsbuildinfo
 dist/**/*.d.ts
 dist/**/*.d.js
+backend/prisma/seed.d.ts
+frontend/next-env.d.ts
 *.ts.map
 *.js.map
 
