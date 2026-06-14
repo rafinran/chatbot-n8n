@@ -51,6 +51,7 @@ lerna-debug.log*
 
 # ── Runtime & Temp ────────────────────────────────────────────
 /uploads/
+backend/uploads/
 /tmp/
 /temp/
 *.pid
