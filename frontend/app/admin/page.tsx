@@ -47,7 +47,8 @@ import {
   getTopTopics,
   getEscalationStats,
   getEscalations,
-  resolveEscalation,
+  deleteUser,
+  replyEscalation,
 } from "@/lib/api";
 
 interface Document {
@@ -197,7 +198,7 @@ function ReportTab() {
           </div>
 
           <ul className="space-y-1.5 text-xs text-gray-500">
-            {["Total & % chat terjawab minggu ini", "Clustering topik via AI (Gemini)", "Analisis gap FAQ dengan AI", "5 user paling aktif minggu ini"].map((item) => (
+            {["Total & % chat terjawab minggu ini", "Clustering topik via AI", "Analisis gap FAQ dengan AI", "5 user paling aktif minggu ini"].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <span className="w-1 h-1 rounded-full bg-[#0A2A8B] flex-shrink-0" />
                 {item}
@@ -365,8 +366,10 @@ function OverviewTab() {
                       className="h-full bg-green-500 rounded-full transition-all"
                       style={{ width: `${(topic.total / maxTopic) * 100}%` }}
                     />
-                  </div>
-                </div>
+      </div>
+
+      {/* Action items */}
+    </div>
               ))}
             </div>
           )}
@@ -410,7 +413,10 @@ function EscalationTab() {
   const [statusFilter, setStatusFilter] = useState("pending");
   const [search, setSearch]     = useState("");
   const [loadingEsc, setLoadingEsc] = useState(true);
-  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [replyModalOpen, setReplyModalOpen] = useState(false);
+  const [replyTicket, setReplyTicket] = useState<any>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [replySending, setReplySending] = useState(false);
 
   const reasonLabel: Record<string, { label: string; cls: string }> = {
     low_confidence: { label: "Confidence rendah", cls: "bg-red-100 text-red-700" },
@@ -441,15 +447,25 @@ function EscalationTab() {
     if (e.key === "Enter") fetchEscalations();
   };
 
-  const handleResolve = async (id: number) => {
-    setResolvingId(id);
+  const handleOpenReply = (ticket: any) => {
+    setReplyTicket(ticket);
+    setReplyMessage("");
+    setReplyModalOpen(true);
+  };
+
+  const handleSendReply = async () => {
+    if (!replyMessage.trim() || !replyTicket) return;
+    setReplySending(true);
     try {
-      await resolveEscalation(id);
+      await replyEscalation(replyTicket.id, replyMessage.trim());
+      setReplyModalOpen(false);
+      setReplyTicket(null);
+      setReplyMessage("");
       await fetchEscalations();
     } catch {
       // silently ignore
     } finally {
-      setResolvingId(null);
+      setReplySending(false);
     }
   };
 
@@ -534,7 +550,7 @@ function EscalationTab() {
                     <tr key={ticket.id} className="border-b hover:bg-gray-50 transition">
                       <td className="px-4 py-3">
                         <p className="font-medium text-xs">{ticket.user}</p>
-                        <p className="text-[11px] text-gray-400">{ticket.username}</p>
+                        <p className="text-[11px] text-gray-400">{ticket.email}</p>
                       </td>
                       <td className="px-4 py-3 max-w-[200px]">
                         <p className="truncate text-xs">{ticket.hasImage ? `[Gambar] ` : ""}{ticket.question}</p>
@@ -564,15 +580,11 @@ function EscalationTab() {
                       <td className="px-4 py-3 text-right">
                         {ticket.status === "pending" && (
                           <button
-                            onClick={() => handleResolve(ticket.id)}
-                            disabled={resolvingId === ticket.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg hover:bg-gray-50 text-xs disabled:opacity-40 transition"
+                            onClick={() => handleOpenReply(ticket)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg hover:bg-[#0A2A8B] hover:text-white text-xs transition"
                           >
-                            {resolvingId === ticket.id
-                              ? <Loader2 size={12} className="animate-spin" />
-                              : <CheckCircle size={12} />
-                            }
-                            Selesai
+                            <Send size={12} />
+                            Balas
                           </button>
                         )}
                       </td>
@@ -584,6 +596,85 @@ function EscalationTab() {
           </div>
         )}
       </div>
+
+      {/* Reply Modal */}
+      {replyModalOpen && replyTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-800">Balas Tiket Eskalasi</h3>
+                <button
+                  onClick={() => { setReplyModalOpen(false); setReplyTicket(null); }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Penerima</p>
+                  <p className="text-sm font-medium">{replyTicket.user}</p>
+                  <p className="text-xs text-gray-500">{replyTicket.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pertanyaan</p>
+                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{replyTicket.question}</p>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Alasan</p>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
+                      {replyTicket.reason === "low_confidence" ? "Confidence rendah" :
+                       replyTicket.reason === "no_answer" ? "Tidak terjawab" :
+                       replyTicket.reason === "no_context" ? "Tidak ada konteks" :
+                       replyTicket.reason === "manual" ? "Manual" : replyTicket.reason}
+                    </span>
+                  </div>
+                  {replyTicket.confidence != null && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Confidence</p>
+                      <p className="text-sm">{Number(replyTicket.confidence).toFixed(2)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">Balasan Anda</label>
+                <textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Tulis balasan untuk pengguna..."
+                  rows={4}
+                  className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A2A8B] focus:border-transparent resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setReplyModalOpen(false); setReplyTicket(null); }}
+                  className="px-4 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSendReply}
+                  disabled={replySending || !replyMessage.trim()}
+                  className="px-5 py-2 rounded-lg bg-[#0A2A8B] text-white text-sm font-medium hover:bg-[#081f66] transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {replySending ? (
+                    <><Loader2 size={14} className="animate-spin" /> Mengirim...</>
+                  ) : (
+                    <><Send size={14} /> Kirim Balasan</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -602,6 +693,8 @@ export default function AdminPage() {
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports"> ("overview");
+  const [searchDocs, setSearchDocs] = useState("");
+  const [searchUsers, setSearchUsers] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -726,6 +819,17 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteUser = async (u: User) => {
+    if (!confirm(`Hapus user "${u.fullName}" (@${u.username})? Semua data chat, eskalasi, dan log aktivitas akan ikut terhapus.`)) return;
+    try {
+      await deleteUser(u.id);
+      showToast(`User ${u.username} berhasil dihapus.`);
+      await fetchUsers();
+    } catch (e: any) {
+      showToast(e.message || "Gagal menghapus user.", "error");
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     router.push("/login");
@@ -742,6 +846,22 @@ export default function AdminPage() {
   const indexed    = docs.filter((d) => d.status === "indexed").length;
   const processing = docs.filter((d) => d.status === "processing").length;
   const failed     = docs.filter((d) => d.status === "failed").length;
+
+  const filteredDocs = searchDocs
+    ? docs.filter(d =>
+        d.originalName.toLowerCase().includes(searchDocs.toLowerCase()) ||
+        d.uploadedBy?.username?.toLowerCase().includes(searchDocs.toLowerCase()) ||
+        d.uploadedBy?.fullName?.toLowerCase().includes(searchDocs.toLowerCase())
+      )
+    : docs;
+
+  const filteredUsers = searchUsers
+    ? users.filter(u =>
+        u.username.toLowerCase().includes(searchUsers.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchUsers.toLowerCase()) ||
+        u.fullName.toLowerCase().includes(searchUsers.toLowerCase())
+      )
+    : users;
 
   return (
     <div className="min-h-screen bg-[#f6f6f7] text-gray-900 font-sans">
@@ -896,11 +1016,24 @@ export default function AdminPage() {
                 <div className="flex items-center gap-2">
                   <Database size={14} className="text-gray-400" />
                   <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">{docs.length}</span>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                    {filteredDocs.length}
+                  </span>
                 </div>
-                <button onClick={fetchDocs} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
-                  <RefreshCw size={11} /> Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-2.5 top-2 text-gray-400" />
+                    <input
+                      value={searchDocs}
+                      onChange={(e) => setSearchDocs(e.target.value)}
+                      placeholder="Cari dokumen..."
+                      className="pl-7 h-8 w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
+                    />
+                  </div>
+                  <button onClick={fetchDocs} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
+                    <RefreshCw size={11} /> Refresh
+                  </button>
+                </div>
               </div>
 
               {docs.length === 0 ? (
@@ -909,7 +1042,7 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
-                  {docs.map((doc) => (
+                  {filteredDocs.map((doc) => (
                     <div key={doc.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition">
                       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
                         <FileIcon mimeType={doc.mimeType} />
@@ -956,11 +1089,24 @@ export default function AdminPage() {
               <div className="flex items-center gap-2">
                 <Users size={14} className="text-gray-400" />
                 <h2 className="text-sm font-semibold text-gray-700">Manajemen User</h2>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">{users.length}</span>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                  {filteredUsers.length}
+                </span>
               </div>
-              <button onClick={fetchUsers} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
-                <RefreshCw size={11} /> Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-2 text-gray-400" />
+                  <input
+                    value={searchUsers}
+                    onChange={(e) => setSearchUsers(e.target.value)}
+                    placeholder="Cari user..."
+                    className="pl-7 h-8 w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
+                  />
+                </div>
+                <button onClick={fetchUsers} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
+                  <RefreshCw size={11} /> Refresh
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -976,7 +1122,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50 transition">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2.5">
@@ -1023,6 +1169,12 @@ export default function AdminPage() {
                           className="text-[11px] text-gray-400 hover:text-[#0A2A8B] transition font-medium"
                         >
                           {u.isActive ? "Nonaktifkan" : "Aktifkan"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          className="text-[11px] text-gray-400 hover:text-red-500 transition font-medium ml-3"
+                        >
+                          <Trash2 size={12} className="inline mr-0.5" /> Hapus
                         </button>
                       </td>
                     </tr>
