@@ -14,7 +14,7 @@ pipeline {
     }
 
     options {
-        timeout(time: 15, unit: 'MINUTES')
+        timeout(time: 20, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
 
@@ -90,6 +90,22 @@ pipeline {
         //
         //     }
         // }
+
+        // ── 3. Test ───────────────────────────────────────────────────
+        stage('Test') {
+            steps {
+                echo '🧪 Running backend tests...'
+                dir('backend') {
+                    sh 'npm ci --prefer-offline'
+                    sh 'npm test'
+                }
+                echo '🧪 Running frontend tests...'
+                dir('frontend') {
+                    sh 'npm ci --prefer-offline'
+                    sh 'npx vitest run'
+                }
+            }
+        }
 
         // ── 4. Build Docker Images ─────────────────────────────────────
         stage('Build') {
