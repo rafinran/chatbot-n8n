@@ -1,239 +1,108 @@
 {
-  "name": "Chatbot",
+  "name": "Chatbot Streaming + Manual RAG + Score Filter",
   "nodes": [
     {
       "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.body.question }}",
-        "needsFallback": true,
-        "options": {
-          "systemMessage": "ATURAN KETAT:\n1. Sebelum menjawab, cek panjang pertanyaan user:\n   - Jika pertanyaan kurang dari 4 kata, balas dengan:\n     \"Mohon jelaskan kendala anda lebih detail agar saya dapat membantu dengan lebih baik.\n     Contoh: 'Bagaimana cara membersihkan print head printer Epson L3150?'\"\n   - Jika pertanyaan 4 kata atau lebih, WAJIB gunakan tool search_faq dari Qdrant sebelum menjawab.\n2. Jika pertanyaan mengandung [Hasil analisis gambar], gunakan informasi tersebut sebagai konteks tambahan sebelum mencari ke Qdrant.\n3. Jawab HANYA berdasarkan informasi dari Qdrant. Jika tidak ditemukan, jawab:\n   \"Maaf, saya tidak memiliki informasi mengenai hal tersebut. Silakan hubungi customer service Epson untuk bantuan lebih lanjut.\"\n4. DILARANG menggunakan pengetahuan umum di luar hasil pencarian.\n5. DILARANG mengarang atau menambahkan informasi yang tidak ada di hasil pencarian.\n6. Jawab dalam bahasa yang sama dengan pertanyaan user."
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
-      "position": [
-        176,
-        496
-      ],
-      "id": "5a86fb08-f46e-4b9d-b69c-9a5eb705a325",
-      "name": "AI Agent",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "modelName": "models/gemini-3.1-flash-lite",
-        "options": {
-          "temperature": 0.1
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1.1,
-      "position": [
-        144,
-        1008
-      ],
-      "id": "3b8671e3-9f7f-4447-b13d-16c6ca3bdd10",
-      "name": "Google Gemini Chat Model",
-      "credentials": {
-        "googlePalmApi": {
-          "id": "wMgV31wo0HG1Gch2",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      },
-      "disabled": true
-    },
-    {
-      "parameters": {
-        "mode": "retrieve-as-tool",
-        "toolDescription": "Gunakan tool ini untuk mencari informasi resmi, panduan, FAQ, solusi, dan prosedur teIknis terkait knowledge base Epson. ",
-        "qdrantCollection": {
-          "__rl": true,
-          "mode": "list",
-          "value": "knowledge_base_epson"
-        },
-        "topK": 15,
-        "useReranker": true,
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
-      "typeVersion": 1.3,
-      "position": [
-        432,
-        672
-      ],
-      "id": "d7c9e24e-c760-4142-ac6a-0ab7dc92e58d",
-      "name": "Qdrant Vector Store",
-      "credentials": {
-        "qdrantApi": {
-          "id": "zAWru2EtXr6pBcLy",
-          "name": "Qdrant account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "modelName": "models/gemini-embedding-2"
-      },
-      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
-      "typeVersion": 1,
-      "position": [
-        432,
-        832
-      ],
-      "id": "df874bf6-0993-4a5d-b24e-2bd1a320cb45",
-      "name": "Embeddings Google Gemini",
-      "credentials": {
-        "googlePalmApi": {
-          "id": "wMgV31wo0HG1Gch2",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        816,
-        416
-      ],
-      "id": "5a774c7a-eb4e-4f5f-ac5f-875cc3dfbaa2",
-      "name": "Respond to Webhook"
-    },
-    {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ $json.body.user_id }}",
-        "contextWindowLength": 20
-      },
-      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
-      "typeVersion": 1.4,
-      "position": [
-        288,
-        832
-      ],
-      "id": "a125e07f-25c5-4118-a16e-49c52fb13a0b",
-      "name": "Postgres Chat Memory",
-      "credentials": {
-        "postgres": {
-          "id": "GBgGq29HJhzuFaXe",
-          "name": "Postgres account 2"
-        }
-      }
-    },
-    {
-      "parameters": {
         "httpMethod": "POST",
-        "path": "rag",
-        "responseMode": "responseNode",
+        "path": "ragatha",
+        "responseMode": "streaming",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -112,
-        496
+        -144,
+        -80
       ],
-      "id": "4f161494-931f-45f2-9541-8ff9d30abfd7",
+      "id": "a3b661c2-5180-4241-851f-bd001ac4bbe8",
       "name": "Webhook",
       "webhookId": "52951c74-ee48-43df-ae5b-866a45561c34"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "7b5f0844-38cb-44be-9a5c-f31aaa8122c2",
-              "name": "answer",
-              "value": "={{ $json.output }}",
-              "type": "string"
-            },
-            {
-              "id": "ba8c048b-3c71-41a6-ba91-695b04fac092",
-              "name": "is_answered",
-              "value": true,
-              "type": "boolean"
-            }
-          ]
-        },
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-2\",\n  \"content\": {\n    \"parts\": [{\"text\": {{ JSON.stringify($json.body.question) }}}]\n  }\n}",
         "options": {}
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        608,
-        320
+        80,
+        -80
       ],
-      "id": "57d8777f-d125-4a1f-b24d-7ba24d6172aa",
-      "name": "Edit Fields"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "2c1a37ab-5f27-4aca-b83b-44ba03516f02",
-              "name": "answer",
-              "value": "Mohon maaf, chatbot sedang down, silakan coba setelah sesaat",
-              "type": "string"
-            },
-            {
-              "id": "5e5b895a-db2b-4333-bf1b-4c383489d0dc",
-              "name": "is_answered",
-              "value": false,
-              "type": "boolean"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        608,
-        512
-      ],
-      "id": "36daba55-72c3-4b86-82a6-4b995686e8bd",
-      "name": "Edit Fields1"
-    },
-    {
-      "parameters": {
-        "model": "qwen/qwen3.5-flash-02-23",
-        "options": {
-          "temperature": 0.1
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-      "typeVersion": 1,
-      "position": [
-        -16,
-        1008
-      ],
-      "id": "848c811b-5ec3-44d5-aa68-b3e6465117d8",
-      "name": "OpenRouter Chat Model",
+      "id": "fd006ca5-2e21-43b4-ac77-c869ca4e570a",
+      "name": "Embed Question",
       "credentials": {
-        "openRouterApi": {
-          "id": "oQ4dG4IVsCVMh4Aj",
-          "name": "OpenRouter account"
+        "googlePalmApi": {
+          "id": "wMgV31wo0HG1Gch2",
+          "name": "Google Gemini(PaLM) Api account"
         }
-      },
-      "disabled": true
+      }
     },
     {
       "parameters": {
-        "topN": 4
+        "method": "POST",
+        "url": "http://qdrant:6333/collections/knowledge_base_epson/points/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vector\": {{ JSON.stringify($json.embedding.values) }},\n  \"limit\": 10,\n  \"with_payload\": true\n}",
+        "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        592,
-        832
+        304,
+        -80
       ],
-      "id": "2aa13cd7-2d93-4921-8d08-0808227deff4",
-      "name": "Reranker Cohere",
+      "id": "2b3a36f9-bb45-499b-ada8-5a7c3f7b9624",
+      "name": "Search Qdrant"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.item.json.result;\nconst question = $('Webhook').item.json.body.question;\n\nconst documents = results.map(r => ({\n  text: r.payload.content || r.payload.pageContent || '',\n  id: r.id,\n  score: r.score\n}));\n\nreturn [{\n  json: {\n    question,\n    documents\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -80
+      ],
+      "id": "e1efa64c-0f69-40f2-9787-fa522e6a3a5e",
+      "name": "Prepare Rerank Input"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.com/v2/rerank",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cohereApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"rerank-v3.5\",\n  \"query\": {{ JSON.stringify($json.question) }},\n  \"documents\": {{ JSON.stringify($json.documents.map(d => d.text)) }},\n  \"top_n\": 10\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        736,
+        -80
+      ],
+      "id": "9e43cb43-e3c0-44b3-91f3-81071e633516",
+      "name": "Cohere Rerank",
       "credentials": {
         "cohereApi": {
           "id": "GAVJYv6vPZyaMx6r",
@@ -242,48 +111,55 @@
       }
     },
     {
-      "parameters": {},
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
-      "typeVersion": 1,
-      "position": [
-        416,
-        1008
-      ],
-      "id": "1d548b1d-959a-4e96-b868-2a2aaef5e413",
-      "name": "Embeddings Ollama",
-      "credentials": {
-        "ollamaApi": {
-          "id": "VLVHvhhBSNq50DuI",
-          "name": "Ollama account"
-        }
+      "parameters": {
+        "jsCode": "const rerankResults = $input.item.json.results;\nconst prepData = $('Prepare Rerank Input').item.json;\nconst question = prepData.question;\nconst originalDocs = prepData.documents;\n\nconst threshold = 0.6;\nconst filtered = rerankResults\n  .filter(r => r.relevance_score >= threshold)\n  .slice(0, 4);\n\nlet contextString = '';\nif (filtered.length === 0) {\n  contextString = 'Tidak ada dokumen yang relevan ditemukan.';\n} else {\n  contextString = filtered\n    .map((r, i) => `[Dokumen ${i+1}]\\n${originalDocs[r.index].text}`)\n    .join('\\n\\n');\n}\n\nreturn [{\n  json: {\n    question,\n    context: contextString,\n    found: filtered.length > 0,\n    user_id: $('Webhook').item.json.body.user_id\n  }\n}];"
       },
-      "disabled": true
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -80
+      ],
+      "id": "5090ce10-d5b6-4ad5-912b-afa48ab09f3f",
+      "name": "Filter by Score > 0.6"
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "MiniMax-M2.7-highspeed",
-          "mode": "list",
-          "cachedResultName": "MiniMax-M2.7-highspeed"
-        },
-        "builtInTools": {},
+        "promptType": "define",
+        "text": "={{ $json.question }}",
+        "needsFallback": true,
         "options": {
-          "temperature": 0.1
+          "systemMessage": "=ATURAN BAHASA (WAJIB):\n* Jangan menampilkan proses berpikir.\n* Deteksi bahasa dari pesan TERAKHIR pengguna.\n* Jika Bahasa Indonesia → jawab seluruhnya dalam Bahasa Indonesia.\n* Jika English → jawab seluruhnya dalam English.\n* Jika campuran → gunakan bahasa yang dominan.\n* Abaikan bahasa pada dokumen, konteks, atau percakapan sebelumnya.\n\nPERAN:\nKamu adalah Chatson, asisten helpdesk resmi Epson Indonesia.\n\nIKUTI LANGKAH BERIKUT SECARA BERURUTAN:\n\nTentukan apakah pertanyaan:\nsecara eksplisit menyebut Epson, ATAU\nmasih berkaitan dengan aktivitas penggunaan perangkat cetak/scan/proyektor yang dapat melibatkan produk Epson.\n\nContoh yang TETAP dianggap relevan:\n\ncara ngeprint di Microsoft Office\ncara print label\ncara scan PDF\ncara install driver printer\nhasil cetak buram\nprinter tidak terdeteksi\n\nContoh yang TIDAK relevan:\n\ncara membuat website\ncara memakai Excel\ncara edit video\nbelajar Python\n* printer\n* printing / mencetak\n* scanner\n* tinta\n* driver\n* instalasi perangkat\n* koneksi perangkat\n* proyektor\n* hasil cetak\n* error perangkat\n* troubleshooting umum\n* penggunaan fitur perangkat\n\nJika tidak relevan:\n\"Maaf, saya hanya dapat membantu pertanyaan seputar produk Epson.\"\nLalu berhenti.\n\nANGGAP MASIH RELEVAN jika berkaitan dengan:\n\nPertanyaan umum yang masih mungkin terkait penggunaan perangkat Epson TETAP dianggap relevan.\n\nJika BENAR-BENAR di luar domain tersebut, balas:\n\"Maaf, saya hanya dapat membantu pertanyaan seputar produk Epson.\"\n\nLalu berhenti.\n\n2. CEK KELENGKAPAN INFORMASI\n   Jika informasi pengguna belum cukup untuk memberi solusi spesifik\n   (contoh: tidak ada model perangkat, gejala tidak jelas, atau pertanyaan terlalu singkat),\n   balas:\n\n\"Mohon jelaskan kendala Anda lebih detail, misalnya tipe perangkat Epson yang digunakan, pesan error (jika ada), dan gejala yang muncul.\"\n\nLalu berhenti.\n\nJANGAN menolak hanya karena jumlah kata sedikit.\n\n3. GUNAKAN KNOWLEDGE BASE\n   Gunakan HANYA informasi dari konteks berikut.\n\nKONTEKS:\n{{ $json.context }}\n\nJika konteks kosong, tidak relevan, atau tidak cukup untuk menjawab:\n\n\"Informasi ini belum tersedia di knowledge base. Pertanyaan Anda akan diteruskan ke tim admin.\"\n\nLalu berhenti.\n\n4. MENJAWAB\n\n* Jawab berdasarkan konteks saja.\n* Jangan mengarang fakta baru.\n* Jangan menyebut bahwa kamu menggunakan konteks atau knowledge base.\n* Rangkum dengan jelas dan langsung ke solusi.\n* Jika konteks berisi langkah-langkah → tampilkan langkah secara berurutan.\n* Jika konteks tidak cukup → gunakan aturan langkah 3.\n"
         }
       },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
       "position": [
-        -16,
-        832
+        1184,
+        -80
       ],
-      "id": "f0188765-54f3-4d2f-ab9c-a7204d96f73f",
-      "name": "OpenAI Chat Model",
+      "id": "3f75cbb2-4f23-4c8e-9d6c-84e8224616b0",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.user_id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        1344,
+        192
+      ],
+      "id": "402b8d3e-eb8a-452f-b970-60be287abe00",
+      "name": "Postgres Chat Memory",
       "credentials": {
-        "openAiApi": {
-          "id": "lK0rVjEilQwnJP5j",
-          "name": "OpenAI account"
+        "postgres": {
+          "id": "GBgGq29HJhzuFaXe",
+          "name": "Postgres account 2"
         }
       }
     },
@@ -303,10 +179,35 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        144,
-        832
+        1040,
+        192
       ],
-      "id": "abb9e185-96bf-4259-b971-c6cb82d115a2",
+      "id": "972341a5-2692-434c-af6c-b0a6167ef7ad",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "lK0rVjEilQwnJP5j",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        192
+      ],
+      "id": "8bc6c793-1df3-4856-b5cd-f6f30445357b",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -318,49 +219,67 @@
   ],
   "pinData": {},
   "connections": {
-    "Google Gemini Chat Model": {
-      "ai_languageModel": [
-        []
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Embed Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Qdrant Vector Store": {
-      "ai_tool": [
+    "Embed Question": {
+      "main": [
+        [
+          {
+            "node": "Search Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Prepare Rerank Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rerank Input": {
+      "main": [
+        [
+          {
+            "node": "Cohere Rerank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cohere Rerank": {
+      "main": [
+        [
+          {
+            "node": "Filter by Score > 0.6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter by Score > 0.6": {
+      "main": [
         [
           {
             "node": "AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ],
-      "main": [
-        []
-      ]
-    },
-    "AI Agent": {
-      "main": [
-        [
-          {
-            "node": "Edit Fields",
             "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Edit Fields1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Embeddings Google Gemini": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "ai_embedding",
             "index": 0
           }
         ]
@@ -377,61 +296,12 @@
         ]
       ]
     },
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields1": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenRouter Chat Model": {
-      "ai_languageModel": [
-        []
-      ]
-    },
     "OpenAI Chat Model": {
       "ai_languageModel": [
         [
           {
             "node": "AI Agent",
             "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reranker Cohere": {
-      "ai_reranker": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "ai_reranker",
             "index": 0
           }
         ]
@@ -454,18 +324,16 @@
     "executionOrder": "v1",
     "binaryMode": "separate",
     "timeSavedMode": "fixed",
-    "timezone": "Asia/Jakarta",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false,
-    "executionTimeout": 60,
     "timeSavedPerExecution": 2
   },
-  "versionId": "fd24046c-3316-4119-9674-e2fffc9fc320",
+  "versionId": "b86bc148-7f99-4f07-ad8c-6a05340b595c",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "5332f57840bfed39adde2164d362828cd65ab061cc8ee56a230e2e3550c50512"
   },
   "nodeGroups": [],
-  "id": "xu35zxAf766ScoPH",
+  "id": "mhm69VzwFwXk6rzw",
   "tags": []
 }
