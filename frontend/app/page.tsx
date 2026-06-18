@@ -70,7 +70,7 @@ export default function HomePage() {
             <a href="#" className="hover:text-[#0A2A8B] transition">EN</a>
             <a href="#" className="hover:text-[#0A2A8B] transition">About Webson</a>
             <a href="#" className="hover:text-[#0A2A8B] transition">Accessibility</a>
-          
+
             {isLoggedIn && user?.role === "ADMIN" && (
               <Button
                 variant="outline"
@@ -80,7 +80,7 @@ export default function HomePage() {
                 Admin
               </Button>
             )}
-          
+
             {isLoggedIn ? (
               <Button
                 variant="outline"
@@ -253,7 +253,15 @@ export default function HomePage() {
                   Ini dummy, gak usah diisi ദ്ദി ( ᵔ ᗜ ᵔ ).
                 </p>
               </div>
-              <Button className="bg-[#0A2A8B] hover:bg-[#081f66] w-full sm:w-auto">
+              <Button className="bg-[#0A2A8B] hover:bg-[#081f66] w-full sm:w-auto"
+                onClick={() => {
+                  alert("Mulai Proses Sign Up Otomatis...");
+                  setTimeout(() => {
+                    window.location.href =
+                      "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+                  }, 1500);
+                }}
+              >
                 Sign Up
               </Button>
             </div>
