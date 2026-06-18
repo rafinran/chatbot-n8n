@@ -56,7 +56,9 @@ export async function registerUser(dto: RegisterDto, req: Request) {
 export async function loginUser(dto: LoginDto, req: Request) {
   const { username, password } = dto;
 
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ username: username }, { email: username }] },
+  });
   if (!user || !(await bcrypt.compare(password, user.hashedPassword))) {
     throw { status: 401, message: "Username atau password salah." };
   }
