@@ -139,7 +139,7 @@ services:
       INDEXER_SECRET:   ${INDEXER_SECRET}
       DOCS_INBOX:       /docs-inbox
       COLLECTION_NAME:  ${QDRANT_COLLECTION} 
-      GOOGLE_API_KEY:   ${GOOGLE_API_KEY}
+      OPENROUTER_API_KEY:       ${OPENROUTER_API_KEY}
     expose:
       - "5000"
     volumes:
