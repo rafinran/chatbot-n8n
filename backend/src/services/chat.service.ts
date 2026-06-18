@@ -113,116 +113,124 @@ const IMAGE_ANALYSIS_TIMEOUT = 20 * 1000; // 20 seconds timeout
 export async function analyzeImage(file: Express.Multer.File, message: string): Promise<string> {
   const base64 = fs.readFileSync(file.path).toString("base64");
 
-  // Strict prompt to limit output to max 50 words
   const promptText = `${message}
 
 PENTING: Analisis gambar MAKSIMAL 50 KATA. Fokus HANYA pada:
-- Jenis masalah/defect (1-2 kata)
-- Lokasi pada gambar (1-2 kata)
-- Tingkat keparahan (1-2 kata)
-- Rekomendasi singkat (3-5 kata)
+- Jenis masalah/defect (10-15 kata)
+- Lokasi pada gambar (10 kata)
+- Tingkat keparahan (10 kata)
+- Rekomendasi singkat (15-20 kata)
 
 JANGAN jelaskan panjang lebar. LANGSUNG KE POIN.`;
 
-  // Try OpenCode MiniMax M3 (OpenAI-compatible)
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), IMAGE_ANALYSIS_TIMEOUT);
-
-  try {
-    const ocRes = await Promise.race([
-      fetch("https://api.opencode.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.opencodeApiKey}`,
-        },
-        body: JSON.stringify({
-          model: "minimax/M3",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: promptText },
-              { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
-            ],
-          }],
-          max_tokens: 50,
-        }),
-        signal: controller.signal,
-      }),
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Image analysis timeout")), IMAGE_ANALYSIS_TIMEOUT);
-      }),
-    ]);
-    clearTimeout(timeoutId);
-    const res = ocRes as Response;
-    if (!res.ok) throw new Error(`OpenCode error: ${res.status}`);
-    const data = await res.json() as any;
-    return data.choices?.[0]?.message?.content ?? "";
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.error("[CHAT] OpenCode MiniMax error: ", err);
-    console.warn("[CHAT] Fallback ke OpenRouter Qwen...");
-  }
-
-  // Fallback via OpenRouter Qwen 3.5 Flash
   if (!env.openRouterApiKey) throw new Error("Sistem analisis gambar sedang tidak tersedia.");
 
-  const controller2 = new AbortController();
-  const timeoutId2 = setTimeout(() => controller2.abort(), IMAGE_ANALYSIS_TIMEOUT);
+  const basePayload = {
+    messages: [{
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: promptText },
+        { type: "image_url" as const, image_url: { url: `data:${file.mimetype};base64,${base64}` } },
+      ],
+    }],
+    max_tokens: 50,
+  };
 
-  try {
-    const orRes = await Promise.race([
-      fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.openRouterApiKey}`,
-        },
-        body: JSON.stringify({
-          model: "qwen/qwen3.5-flash-02-23",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: promptText },
-              { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64}` } },
-            ],
-          }],
-          max_tokens: 50,
+  // Primary: Gemini 3.1 Flash
+  {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), IMAGE_ANALYSIS_TIMEOUT);
+    try {
+      const res = await Promise.race([
+        fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.openRouterApiKey}`,
+          },
+          body: JSON.stringify({ model: "google/gemini-3.1-flash-lite", ...basePayload }),
+          signal: controller.signal,
         }),
-        signal: controller2.signal,
-      }),
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("OpenRouter timeout")), IMAGE_ANALYSIS_TIMEOUT);
-      }),
-    ]);
-    clearTimeout(timeoutId2);
-    const res = orRes as Response;
-    if (!res.ok) throw new Error("OpenRouter error");
-    const orData = await res.json() as any;
-    return orData.choices?.[0]?.message?.content ?? "";
-  } catch (err: any) {
-    clearTimeout(timeoutId2);
-    console.error("[CHAT] OpenRouter error: ", err);
-    throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Image analysis timeout")), IMAGE_ANALYSIS_TIMEOUT)),
+      ]);
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json() as any;
+        return data.choices?.[0]?.message?.content ?? "";
+      }
+      console.warn(`[CHAT] Gemini 3.1 Flash gagal (${res.status}), fallback ke Qwen...`);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.warn("[CHAT] Gemini 3.1 Flash error:", err.message, "fallback ke Qwen...");
+    }
+  }
+
+  // Fallback: Qwen 3.5 Flash
+  {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), IMAGE_ANALYSIS_TIMEOUT);
+    try {
+      const res = await Promise.race([
+        fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.openRouterApiKey}`,
+          },
+          body: JSON.stringify({ model: "qwen/qwen3.5-flash-02-23", ...basePayload }),
+          signal: controller.signal,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Image analysis timeout")), IMAGE_ANALYSIS_TIMEOUT)),
+      ]);
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`OpenRouter error: ${res.status}`);
+      const data = await res.json() as any;
+      return data.choices?.[0]?.message?.content ?? "";
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.error("[CHAT] Qwen fallback error:", err);
+      throw new Error("Sistem analisis gambar sedang tidak tersedia.");
+    }
   }
 }
 
 // ── Answer status resolution ──────────────────────────────────────────────────
 
 const UNANSWERED_PATTERNS: RegExp[] = [
-  /tidak memiliki informasi mengenai/i,
-  /saya tidak memiliki informasi/i,
-  /silakan hubungi customer service epson/i,
-  /tidak dapat menemukan informasi/i,
-  /tidak ada informasi.*tersebut/i,
+  /tidak memiliki informasi/i,
+  /saya tidak memiliki/i,
+  /silakan hubungi customer service/i,
+  /tidak dapat menemukan/i,
+  /tidak ada informasi/i,
   /di luar cakupan/i,
-  /tidak tersedia dalam knowledge base/i,
+  /tidak tersedia/i,
+  /belum tersedia/i,
   /akan diteruskan ke tim admin/i,
   /akan dikirim ke admin/i,
+  /tidak cukup untuk menjawab/i,
+  /hanya dapat membantu pertanyaan/i,
+  /di luar domain/i,
+  /belum cukup untuk/i,
+  /mohon jelaskan kendala/i,
+  /pertanyaan anda akan diteruskan/i,
+  /diteruskan ke tim/i,
+  /saya hanya bisa membantu/i,
+  /saya tidak bisa menjawab/i,
+  /tidak ditemukan/i,
+  /tidak ada dokumen yang relevan/i,
+  /i cannot answer/i,
+  /i don't have information/i,
+  /outside the scope/i,
+  /not available in/i,
+  /please contact.*support/i,
 ];
 
 export function resolveIsAnswered(answer: string, n8nIsAnswered: boolean): boolean {
   if (!n8nIsAnswered) return false;
+  const trimmed = answer.trim();
+  if (!trimmed || trimmed.length < 10) return false;
   if (UNANSWERED_PATTERNS.some((p) => p.test(answer))) return false;
   return true;
 }
@@ -237,6 +245,61 @@ export async function callN8n(question: string, userId: number, userEmail: strin
   });
   if (!res.ok) throw new Error(`n8n workflow error: ${res.status}`);
   return res.json() as Promise<N8nResponseDto>;
+}
+
+export async function* callN8nStream(question: string, userId: number, userEmail: string): AsyncGenerator<string> {
+  const res = await fetch(env.n8nWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, user_id: String(userId), user_email: userEmail }),
+  });
+  if (!res.ok) throw new Error(`n8n workflow error: ${res.status}`);
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body from n8n");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value) buffer += decoder.decode(value, { stream: !done });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const data = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[N8N_STREAM]", data.slice(0, 200));
+      }
+
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === "item" && typeof parsed.content === "string") {
+          yield parsed.content;
+        }
+        else if (parsed.type === "text" && typeof parsed.text === "string") {
+          yield parsed.text;
+        }
+        else if (!parsed.type && !parsed.name && (
+          typeof parsed.response === "string" ||
+          typeof parsed.answer === "string" ||
+          typeof parsed.content === "string" ||
+          typeof parsed.output === "string"
+        )) {
+          yield parsed.response || parsed.answer || parsed.content || parsed.output;
+        }
+      } catch {
+        // kalau bukan JSON (raw text), skip aja
+      }
+    }
+
+    if (done) break;
+  }
 }
 
 // ── Activity log (audit trail: login/logout) ──────────────────────────────────
