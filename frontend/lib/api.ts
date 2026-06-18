@@ -80,6 +80,58 @@ export async function sendMessage(payload: string | FormData | { message: string
   return response.json();
 }
 
+export async function sendMessageStream(
+  payload: string | FormData | { message: string; conversationId?: number },
+  onToken: (token: string) => void,
+  onImageUrl?: (url: string) => void,
+): Promise<{ isAnswered: boolean; conversationId: number }> {
+  const isFormData = payload instanceof FormData;
+  const isObject = !isFormData && typeof payload === "object" && payload !== null;
+
+  const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+    method: "POST",
+    headers: isFormData
+      ? ({ credentials: "include" } as any)
+      : { "Content-Type": "application/json" },
+    credentials: "include",
+    body: isFormData ? payload : JSON.stringify(isObject ? payload : { message: payload }),
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result = { isAnswered: true, conversationId: 0 };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value) buffer += decoder.decode(value, { stream: !done });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data: ")) continue;
+      try {
+        const data = JSON.parse(trimmed.slice(6));
+        if (data.token) onToken(data.token);
+        else if (data.imageUrl) onImageUrl?.(data.imageUrl);
+        else if (data.done) result = { isAnswered: data.isAnswered, conversationId: data.conversationId };
+        else if (data.error) throw new Error(data.error);
+      } catch (e) {
+        if (e instanceof SyntaxError) continue;
+        throw e;
+      }
+    }
+
+    if (done) break;
+  }
+
+  return result;
+}
+
 export async function getChatHistory() {
   return apiCall("/chat/history");
 }
@@ -259,3 +311,4 @@ export async function resendVerificationEmail(email: string) {
     body: JSON.stringify({ email }),
   });
 }
+

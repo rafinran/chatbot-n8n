@@ -18,15 +18,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   PanelLeftOpen,
-} from "lucide-react";
-
+}
+  from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
-  sendMessage,
+  sendMessageStream,
   getChatHistory,
-  logout,
   getChatHistoryByConversation,
-  createConversation,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
@@ -50,7 +48,7 @@ interface LinkMeta {
 }
 
 const suggestions = [
-  "How do I replace Epson printer ink?",
+  "How do I refill the ink tanks?",
   "Why are my print results blurry?",
   "Help me connect my printer to Wi-Fi",
   "How do I fix a paper jam issue?",
@@ -272,6 +270,7 @@ export default function ChatbotPage() {
     const userMessage = message;
     const imageFile = attachedFiles[0] ?? null;
     const imagePreviewUrl = imageFile ? URL.createObjectURL(imageFile) : undefined;
+    const assistantId = crypto.randomUUID();
 
     setMessage("");
     setPopupOpen(false);
@@ -283,6 +282,11 @@ export default function ChatbotPage() {
         role: "user",
         content: userMessage,
         imageUrl: imagePreviewUrl,
+      },
+      {
+        id: assistantId,
+        role: "assistant",
+        content: "",
       },
     ];
     setMessages(newMessages);
@@ -304,38 +308,37 @@ export default function ChatbotPage() {
         payload = msgPayload;
       }
 
-      const response = await sendMessage(payload);
+      let fullContent = "";
+      const result = await sendMessageStream(
+        payload,
+        (token) => {
+          fullContent += token;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: fullContent } : m
+            )
+          );
+        },
+        (url) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.role === "user" && m.imageUrl ? { ...m, imageUrl: url } : m
+            )
+          );
+        },
+      );
 
-      if (response?.conversationId && !conversationId) {
-        setConversationId(response.conversationId);
+      if (result.conversationId && !conversationId) {
+        setConversationId(result.conversationId);
       }
-
-      // Ganti blob URL dengan persistent imageUrl dari backend
-      const updatedMessages = response.imageUrl
-        ? newMessages.map(msg =>
-            msg.role === "user" && msg.imageUrl
-              ? { ...msg, imageUrl: response.imageUrl }
-              : msg
-          )
-        : newMessages;
-
-      setMessages([
-        ...updatedMessages,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: response.response,
-        },
-      ]);
     } catch (err: any) {
-      setMessages([
-        ...newMessages,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `Error: ${err.message || "Failed to send message"}`,
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: `Error: ${err.message || "Failed to send message"}` }
+            : m
+        )
+      );
     } finally {
       setSending(false);
       setAttachedFiles([]);
@@ -721,3 +724,4 @@ export default function ChatbotPage() {
     </div>
   );
 }
+

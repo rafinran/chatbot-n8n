@@ -51,10 +51,10 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
     // Auto-escalate kalau tidak terjawab
     await maybeEscalate({
       chatLogId,
-      userId:     req.user.id,
+      userId: req.user.id,
       isAnswered,
       confidence: (n8nData as any).confidence,
-      question:   message,
+      question: message,
     }).catch((err) => {
       console.warn("[CHAT] maybeEscalate error:", err.message);
     });
@@ -68,7 +68,7 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response): Pro
 
 export const getHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const conversationIdStr = (req.query.conversationId as string) || "";
-  const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) : 
+  const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) :
     await chatService.getOrCreateConversation(req.user.id);
   const history = await chatService.getSession(conversationId);
   res.json({ history, conversationId });
@@ -126,4 +126,71 @@ export const escalateChat = asyncHandler(async (req: Request, res: Response): Pr
   });
 
   res.json({ message: "Pertanyaan diteruskan ke tim admin." });
+});
+
+export const sendMessageStream = asyncHandler(async (req: Request, res: Response): Promise<any> => {
+  const parsed = SendMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const message = parsed.data.message;
+  let conversationId = parsed.data.conversationId;
+
+  if (!conversationId) {
+    conversationId = await chatService.getOrCreateConversation(req.user.id);
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  try {
+    let question = message;
+    let imageUrl: string | undefined;
+
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+      const imageAnalysis = await chatService.analyzeImage(req.file, message);
+      question = `${message}\n\n[Hasil analisis gambar]:\n${imageAnalysis}`;
+      res.write(`data: ${JSON.stringify({ imageUrl })}\n\n`);
+    }
+
+    let fullAnswer = "";
+    for await (const chunk of chatService.callN8nStream(question, req.user.id, req.user.email)) {
+      fullAnswer += chunk;
+      res.write(`data: ${JSON.stringify({ token: chunk })}\n\n`);
+    }
+
+    // Bersihin noise streaming AI Agent
+    const cleaned = fullAnswer
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
+      .replace(/Calling \w+ with input:[\s\S]*?\}/g, "")
+      .replace(/\{\s*"type"\s*:\s*"[^"]*"[^}]*\}/g, "")
+      .replace(/Thought:[\s\S]*?(?=Action:|$)/g, "")
+      .replace(/Action:[\s\S]*?(?=Observation:|$)/g, "")
+      .replace(/Observation:[\s\S]*?(?=Thought:|Final Answer:|$)/g, "")
+      .replace(/Final Answer:\s*/g, "")
+      .trim();
+
+    if (!cleaned) throw new Error("Agent tidak menghasilkan jawaban.");
+
+    const isAnswered = chatService.resolveIsAnswered(cleaned, true);
+    await chatService.appendSession(conversationId, message, cleaned, imageUrl);
+
+    const chatLogId = await chatService.logChat(req.user.id, message, isAnswered, !!req.file, req.file?.filename);
+
+    await maybeEscalate({ chatLogId, userId: req.user.id, isAnswered, confidence: undefined, question: message })
+      .catch((err) => console.warn("[CHAT] maybeEscalate error:", err.message));
+
+    res.write(`data: ${JSON.stringify({ done: true, isAnswered, conversationId })}\n\n`);
+  } catch (err: any) {
+    res.write(`data: ${JSON.stringify({ error: err.message || "Gagal memproses" })}\n\n`);
+  } finally {
+    res.end();
+  }
 });
