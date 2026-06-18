@@ -14,20 +14,20 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
-import google.generativeai as genai
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ── Config ────────────────────────────────────────────────────────────────────
-QDRANT_URL      = os.getenv("QDRANT_URL")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME")
-BACKEND_URL     = os.getenv("BACKEND_URL")
-INDEXER_SECRET  = os.getenv("INDEXER_SECRET")
-DOCS_INBOX      = Path(os.getenv("DOCS_INBOX", "/docs-inbox"))
-GOOGLE_API_KEY  = os.getenv("GOOGLE_API_KEY")
-EMBEDDING_MODEL = "models/gemini-embedding-2"
-VECTOR_SIZE     = 3072
-CHUNK_SIZE      = 1000
-CHUNK_OVERLAP   = 150
+QDRANT_URL         = os.getenv("QDRANT_URL")
+COLLECTION_NAME    = os.getenv("COLLECTION_NAME")
+BACKEND_URL        = os.getenv("BACKEND_URL")
+INDEXER_SECRET     = os.getenv("INDEXER_SECRET")
+DOCS_INBOX         = Path(os.getenv("DOCS_INBOX", "/docs-inbox"))
+OPENROUTER_API_KEY  = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE    = "https://openrouter.ai/api/v1"
+EMBEDDING_MODEL    = "google/gemini-embedding-2"
+VECTOR_SIZE        = 3072
+CHUNK_SIZE         = 1000
+CHUNK_OVERLAP      = 150
 
 BLOB_TYPE_MAP = {
     ".pdf":  "application/pdf",
@@ -63,23 +63,45 @@ def _ensure_collection(client: QdrantClient):
         log.info("Collection '%s' dibuat.", COLLECTION_NAME)
 
 
-def _init_gemini():
-    if not GOOGLE_API_KEY:
-        raise ValueError("GOOGLE_API_KEY tidak di-set.")
-    genai.configure(api_key=GOOGLE_API_KEY)
-
-
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
-    _init_gemini()
-    result = genai.embed_content(
-        model=EMBEDDING_MODEL,
-        content=chunks,
-        task_type="RETRIEVAL_DOCUMENT",
-    )
-    embeddings = result["embedding"]
-    if embeddings and not isinstance(embeddings[0], list):
-        return [embeddings]
-    return embeddings
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OPENROUTER_API_KEY tidak di-set.")
+
+    all_embeddings: list[list[float]] = []
+    max_retries = 5
+
+    for chunk in chunks:
+        for attempt in range(max_retries):
+            try:
+                resp = httpx.post(
+                    f"{OPENROUTER_BASE}/embeddings",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"model": EMBEDDING_MODEL, "input": chunk},
+                    timeout=30,
+                )
+                if resp.status_code == 429:
+                    wait = (2 ** attempt) * 1.5
+                    log.warning("Rate limit 429, retry %d/%d in %.1fs", attempt + 1, max_retries, wait)
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                all_embeddings.append(data["data"][0]["embedding"])
+                break
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    wait = (2 ** attempt) * 1.5
+                    log.warning("Rate limit 429, retry %d/%d in %.1fs", attempt + 1, max_retries, wait)
+                    time.sleep(wait)
+                    continue
+                raise
+        else:
+            raise RuntimeError(f"Gagal embed chunk setelah {max_retries} retry")
+
+    return all_embeddings
 
 
 def _delete_doc_vectors(client: QdrantClient, doc_id: int):
