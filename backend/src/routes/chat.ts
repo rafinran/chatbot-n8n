@@ -4,6 +4,7 @@ import { Router } from "express";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.ts";
+import { imageUploadLimit } from "../middleware/rateLimitImage.ts";
 import * as chatController from "../controllers/chat.controller.ts";
 import { UPLOAD_MAX_SIZE_MB } from "../config/env.ts";
 
@@ -46,14 +47,15 @@ const upload = multer({
 const router = Router();
 
 // Chat messaging
-router.post("/",        requireAuth, chatLimiter, upload.single("image"), chatController.sendMessage);
-router.get("/history",  requireAuth, chatController.getHistory);
+router.post("/", requireAuth, chatLimiter, imageUploadLimit, upload.single("image"), chatController.sendMessage);
+router.post("/stream", requireAuth, chatLimiter, imageUploadLimit, upload.single("image"), chatController.sendMessageStream);
+router.get("/history", requireAuth, chatController.getHistory);
 
 // Conversation management
-router.get("/conversations",           requireAuth, chatController.listConversations);
-router.post("/conversations",          requireAuth, chatController.createConversation);
-router.delete("/conversations/:id",    requireAuth, chatController.deleteConversation);
-router.patch("/conversations/:id",     requireAuth, chatController.updateConversationTitle);
+router.get("/conversations", requireAuth, chatController.listConversations);
+router.post("/conversations", requireAuth, chatController.createConversation);
+router.delete("/conversations/:id", requireAuth, chatController.deleteConversation);
+router.patch("/conversations/:id", requireAuth, chatController.updateConversationTitle);
 
 // Deprecated: clearHistory for backward compatibility (now deletes active conversation)
 router.delete("/history", requireAuth, chatController.clearHistory);
@@ -62,3 +64,4 @@ router.delete("/history", requireAuth, chatController.clearHistory);
 router.post("/escalate", requireAuth, chatController.escalateChat);
 
 export default router;
+

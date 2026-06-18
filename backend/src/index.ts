@@ -8,8 +8,8 @@ dotenv.config();
 
 import { env } from "./config/env.ts";
 import prisma from "./db.ts";
-import authRouter  from "./routes/auth.ts";
-import chatRouter  from "./routes/chat.ts";
+import authRouter from "./routes/auth.ts";
+import chatRouter from "./routes/chat.ts";
 import adminRouter from "./routes/admin.ts";
 import reportRouter from "./routes/report.ts";
 
@@ -40,15 +40,15 @@ const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-app.use("/api/auth",  authRouter);
-app.use("/api/chat",  chatRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/chat", chatRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/reports", reportRouter);
 
 app.get("/api/health", async (_req: Request, res: Response): Promise<void> => {
   const checks: Record<string, string> = {
     database: "ok",
-    indexer:  "ok",
+    indexer: "ok",
   };
 
   try {
@@ -79,31 +79,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction): void => {
 const server = app.listen(env.port, "0.0.0.0", () => {
   console.log(`✅ Backend running on port ${env.port}`);
 });
-
-// ── Keep-alive ping to n8n webhook (every 5 minutes) to prevent cold start ──
-const N8N_KEEPALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-function pingN8nWebhook() {
-  fetch(env.n8nWebhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      question: "[KEEPALIVE]",
-      user_id: "0",
-      user_email: "system@keepalive",
-    }),
-  }).catch((err) => {
-    // Silently fail - this is just a keep-alive ping
-    console.warn("[KEEPALIVE] n8n ping failed:", err.message);
-  });
-}
-
-// Start keep-alive after server is running
-setTimeout(() => {
-  console.log("[KEEPALIVE] Starting n8n webhook keep-alive pings (every 5 minutes)");
-  pingN8nWebhook();
-  setInterval(pingN8nWebhook, N8N_KEEPALIVE_INTERVAL);
-}, 5000);
 
 // ── Cleanup upload gambar > 7 hari ──
 const CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // setiap 6 jam

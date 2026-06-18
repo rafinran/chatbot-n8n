@@ -36,7 +36,7 @@ vi.mock("../../src/db.ts", () => ({
   default: {
     n8n_chat_histories: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
-    chatLog: { create: vi.fn() },
+    chatLog: { create: vi.fn(), count: vi.fn().mockResolvedValue(0) },
   },
 }));
 
