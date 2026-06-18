@@ -26,12 +26,10 @@ import {
   Mail,
   Home,
   AlertTriangle,
-  Clock3,
   MessageCircle,
-  Eye,
   Search,
-  Filter,
-} from "lucide-react";
+}
+  from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   getDocuments,
@@ -88,8 +86,8 @@ function FileIcon({ mimeType }: { mimeType: string }) {
 function StatusBadge({ status }: { status: Document["status"] }) {
   const map = {
     processing: { icon: <Loader2 size={11} className="animate-spin" />, label: "Memproses", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-    indexed:    { icon: <CheckCircle size={11} />,                       label: "Terindeks",  cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    failed:     { icon: <XCircle size={11} />,                           label: "Gagal",      cls: "bg-red-50 text-red-600 border-red-200" },
+    indexed: { icon: <CheckCircle size={11} />, label: "Terindeks", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    failed: { icon: <XCircle size={11} />, label: "Gagal", cls: "bg-red-50 text-red-600 border-red-200" },
   };
   const { icon, label, cls } = map[status];
   return (
@@ -230,12 +228,7 @@ function ReportTab() {
 
       {/* Note */}
       <div className="rounded-xl border border-gray-100 bg-gray-50 px-5 py-4">
-        <p className="text-xs font-semibold text-gray-600 mb-2">Catatan Konfigurasi</p>
-        <ul className="space-y-1 text-xs text-gray-400">
-          <li>• Email tujuan dikonfigurasi via env var <code className="bg-gray-100 px-1 rounded">REPORT_RECIPIENT</code> di server</li>
-          <li>• Pastikan <code className="bg-gray-100 px-1 rounded">GMAIL_USER</code> dan <code className="bg-gray-100 px-1 rounded">GMAIL_APP_PASSWORD</code> sudah diset</li>
-          <li>• Proses pengiriman bisa memakan waktu 10–30 detik karena analisis AI</li>
-        </ul>
+        <p className="text-xs text-gray-600 mb-2">Proses pengiriman bisa memakan waktu 10-30 detik karena analisis AI</p>
       </div>
     </div>
   );
@@ -298,7 +291,7 @@ function OverviewTab() {
       </div>
 
       {/* KPI */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 text-gray-500 text-sm">
             <MessageCircle size={14} /> Total Chat Hari Ini
@@ -326,7 +319,7 @@ function OverviewTab() {
       </div>
 
       {/* Charts */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Volume bar chart */}
         <div className="bg-white rounded-xl border p-5">
           <h3 className="font-semibold mb-4">Volume Chat 7 Hari Terakhir</h3>
@@ -366,10 +359,10 @@ function OverviewTab() {
                       className="h-full bg-green-500 rounded-full transition-all"
                       style={{ width: `${(topic.total / maxTopic) * 100}%` }}
                     />
-      </div>
+                  </div>
 
-      {/* Action items */}
-    </div>
+                  {/* Action items */}
+                </div>
               ))}
             </div>
           )}
@@ -377,7 +370,7 @@ function OverviewTab() {
       </div>
 
       {/* Action items */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <h3 className="font-semibold text-yellow-700">
             {stats?.pendingEscalation ?? 0} Tiket Eskalasi Pending
@@ -408,10 +401,10 @@ function OverviewTab() {
 }
 
 function EscalationTab() {
-  const [tickets, setTickets]   = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [escStats, setEscStats] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState("pending");
-  const [search, setSearch]     = useState("");
+  const [search, setSearch] = useState("");
   const [loadingEsc, setLoadingEsc] = useState(true);
   const [replyModalOpen, setReplyModalOpen] = useState(false);
   const [replyTicket, setReplyTicket] = useState<any>(null);
@@ -420,9 +413,9 @@ function EscalationTab() {
 
   const reasonLabel: Record<string, { label: string; cls: string }> = {
     low_confidence: { label: "Confidence rendah", cls: "bg-red-100 text-red-700" },
-    no_answer:      { label: "Tidak terjawab",    cls: "bg-amber-100 text-amber-700" },
-    no_context:     { label: "Tidak ada konteks", cls: "bg-blue-100 text-blue-700" },
-    manual:         { label: "Manual",             cls: "bg-gray-100 text-gray-700" },
+    no_answer: { label: "Tidak terjawab", cls: "bg-amber-100 text-amber-700" },
+    no_context: { label: "Tidak ada konteks", cls: "bg-blue-100 text-blue-700" },
+    manual: { label: "Manual", cls: "bg-gray-100 text-gray-700" },
   };
 
   const fetchEscalations = async () => {
@@ -472,7 +465,7 @@ function EscalationTab() {
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-5">
           <p className="text-xs text-gray-500">Pending hari ini</p>
           <p className="text-4xl font-bold text-amber-500 mt-2">{escStats?.pendingToday ?? 0}</p>
@@ -496,11 +489,10 @@ function EscalationTab() {
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs capitalize transition ${
-                  statusFilter === s
-                    ? "bg-[#0A2A8B] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs capitalize transition ${statusFilter === s
+                  ? "bg-[#0A2A8B] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 {s === "all" ? "Semua" : s === "pending" ? "Pending" : "Selesai"}
               </button>
@@ -512,7 +504,7 @@ function EscalationTab() {
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearch}
                 placeholder="Cari user atau pertanyaan..."
-                className="pl-8 h-9 w-52 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
+                className="pl-8 h-9 w-full sm:w-52 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
               />
             </div>
             <button
@@ -569,11 +561,10 @@ function EscalationTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          ticket.status === "pending"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-green-100 text-green-700"
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ticket.status === "pending"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-green-100 text-green-700"
+                          }`}>
                           {ticket.status === "pending" ? "Pending" : "Selesai"}
                         </span>
                       </td>
@@ -627,9 +618,9 @@ function EscalationTab() {
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Alasan</p>
                     <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
                       {replyTicket.reason === "low_confidence" ? "Confidence rendah" :
-                       replyTicket.reason === "no_answer" ? "Tidak terjawab" :
-                       replyTicket.reason === "no_context" ? "Tidak ada konteks" :
-                       replyTicket.reason === "manual" ? "Manual" : replyTicket.reason}
+                        replyTicket.reason === "no_answer" ? "Tidak terjawab" :
+                          replyTicket.reason === "no_context" ? "Tidak ada konteks" :
+                            replyTicket.reason === "manual" ? "Manual" : replyTicket.reason}
                     </span>
                   </div>
                   {replyTicket.confidence != null && (
@@ -692,11 +683,10 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports"> ("overview");
+  const [tab, setTab] = useState<"overview" | "documents" | "eskalasi" | "users" | "reports">("overview");
   const [searchDocs, setSearchDocs] = useState("");
   const [searchUsers, setSearchUsers] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -734,12 +724,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     const hasProcessing = docs.some((d) => d.status === "processing");
-    
+
     if (!hasProcessing) return;
 
     const interval = setInterval(async () => {
       await fetchDocs();
-    }, 3000); 
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [docs, fetchDocs]);
@@ -843,24 +833,24 @@ export default function AdminPage() {
     );
   }
 
-  const indexed    = docs.filter((d) => d.status === "indexed").length;
+  const indexed = docs.filter((d) => d.status === "indexed").length;
   const processing = docs.filter((d) => d.status === "processing").length;
-  const failed     = docs.filter((d) => d.status === "failed").length;
+  const failed = docs.filter((d) => d.status === "failed").length;
 
   const filteredDocs = searchDocs
     ? docs.filter(d =>
-        d.originalName.toLowerCase().includes(searchDocs.toLowerCase()) ||
-        d.uploadedBy?.username?.toLowerCase().includes(searchDocs.toLowerCase()) ||
-        d.uploadedBy?.fullName?.toLowerCase().includes(searchDocs.toLowerCase())
-      )
+      d.originalName.toLowerCase().includes(searchDocs.toLowerCase()) ||
+      d.uploadedBy?.username?.toLowerCase().includes(searchDocs.toLowerCase()) ||
+      d.uploadedBy?.fullName?.toLowerCase().includes(searchDocs.toLowerCase())
+    )
     : docs;
 
   const filteredUsers = searchUsers
     ? users.filter(u =>
-        u.username.toLowerCase().includes(searchUsers.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchUsers.toLowerCase()) ||
-        u.fullName.toLowerCase().includes(searchUsers.toLowerCase())
-      )
+      u.username.toLowerCase().includes(searchUsers.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchUsers.toLowerCase()) ||
+      u.fullName.toLowerCase().includes(searchUsers.toLowerCase())
+    )
     : users;
 
   return (
@@ -879,36 +869,35 @@ export default function AdminPage() {
 
       {/* Navbar */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-3 group"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A2A8B] text-white">
-              <ShieldCheck size={15} />
-            </div>
-            {/* <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span> */}
-            {/* <span className="text-gray-300">·</span>  */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-auto sm:h-14 flex flex-wrap items-center justify-between gap-2 py-2 sm:py-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <Link
+              href="/"
+              className="flex items-center gap-3 group"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A2A8B] text-white">
+                <ShieldCheck size={15} />
+              </div>
+              {/* <span className="font-bold text-[#0A2A8B] text-base tracking-tight">Admin Panel</span> */}
+              {/* <span className="text-gray-300">·</span>  */}
 
-        <span className="font-bold text-[#0A2A8B] text-base tracking-tight group-hover:text-[#081f66] transition">
-          Admin Panel
-        </span>
-      </Link>
+              <span className="font-bold text-[#0A2A8B] text-base tracking-tight group-hover:text-[#081f66] transition">
+                Admin Panel
+              </span>
+            </Link>
 
-      <span className="text-gray-300">·</span>
+            <span className="text-gray-300">·</span>
             <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
               <button
-                  onClick={() => setTab("overview")}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition ${
-                    tab === "overview"
-                      ? "bg-white shadow text-[#0A2A8B]"
-                      : "text-gray-500 hover:text-gray-700"
+                onClick={() => setTab("overview")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "overview"
+                  ? "bg-white shadow text-[#0A2A8B]"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
-                >
-                  <Home size={12} className="inline mr-1" />
-                  Overview
-                </button>
+              >
+                <Home size={12} className="inline mr-1" />
+                Overview
+              </button>
               <button
                 onClick={() => setTab("documents")}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "documents" ? "bg-white shadow text-[#0A2A8B]" : "text-gray-500 hover:text-gray-700"}`}
@@ -917,11 +906,10 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={() => setTab("eskalasi")}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition ${
-                  tab === "eskalasi"
-                    ? "bg-white shadow text-[#0A2A8B]"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition ${tab === "eskalasi"
+                  ? "bg-white shadow text-[#0A2A8B]"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 <AlertTriangle size={12} className="inline mr-1" />
                 Eskalasi
@@ -949,7 +937,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-6">
         {tab === "overview" && <OverviewTab />}
 
         {tab === "eskalasi" && <EscalationTab />}
@@ -957,11 +945,11 @@ export default function AdminPage() {
         {tab === "documents" && (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { label: "Terindeks",  value: indexed,    color: "text-emerald-600", bg: "bg-white border-gray-200", dot: "bg-emerald-500" },
-                { label: "Memproses",  value: processing, color: "text-amber-600",   bg: "bg-white border-gray-200", dot: "bg-amber-400"   },
-                { label: "Gagal",      value: failed,     color: "text-red-600",     bg: "bg-white border-gray-200", dot: "bg-red-500"     },
+                { label: "Terindeks", value: indexed, color: "text-emerald-600", bg: "bg-white border-gray-200", dot: "bg-emerald-500" },
+                { label: "Memproses", value: processing, color: "text-amber-600", bg: "bg-white border-gray-200", dot: "bg-amber-400" },
+                { label: "Gagal", value: failed, color: "text-red-600", bg: "bg-white border-gray-200", dot: "bg-red-500" },
               ].map(({ label, value, color, bg, dot }) => (
                 <div key={label} className={`rounded-xl border p-5 shadow-sm ${bg}`}>
                   <div className="flex items-center gap-2 mb-2">
@@ -1012,7 +1000,7 @@ export default function AdminPage() {
 
             {/* Document list */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <Database size={14} className="text-gray-400" />
                   <h2 className="text-sm font-semibold text-gray-700">Dokumen Knowledge Base</h2>
@@ -1027,7 +1015,7 @@ export default function AdminPage() {
                       value={searchDocs}
                       onChange={(e) => setSearchDocs(e.target.value)}
                       placeholder="Cari dokumen..."
-                      className="pl-7 h-8 w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
+                      className="pl-7 h-8 w-full sm:w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
                     />
                   </div>
                   <button onClick={fetchDocs} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
@@ -1085,7 +1073,7 @@ export default function AdminPage() {
 
         {tab === "users" && (
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
                 <Users size={14} className="text-gray-400" />
                 <h2 className="text-sm font-semibold text-gray-700">Manajemen User</h2>
@@ -1100,7 +1088,7 @@ export default function AdminPage() {
                     value={searchUsers}
                     onChange={(e) => setSearchUsers(e.target.value)}
                     placeholder="Cari user..."
-                    className="pl-7 h-8 w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
+                    className="pl-7 h-8 w-full sm:w-44 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[#0A2A8B]"
                   />
                 </div>
                 <button onClick={fetchUsers} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#0A2A8B] transition">
@@ -1109,7 +1097,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
@@ -1139,11 +1127,10 @@ export default function AdminPage() {
                       <td className="px-5 py-3">
                         <button
                           onClick={() => handleToggleUserRole(u)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${
-                            u.role === "ADMIN"
-                              ? "bg-[#0A2A8B]/10 text-[#0A2A8B] border-[#0A2A8B]/20 hover:bg-[#0A2A8B]/20"
-                              : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${u.role === "ADMIN"
+                            ? "bg-[#0A2A8B]/10 text-[#0A2A8B] border-[#0A2A8B]/20 hover:bg-[#0A2A8B]/20"
+                            : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                            }`}
                         >
                           {u.role}
                         </button>
@@ -1151,11 +1138,10 @@ export default function AdminPage() {
                       <td className="px-5 py-3">
                         <button
                           onClick={() => handleToggleUserStatus(u)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${
-                            u.isActive
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                              : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition ${u.isActive
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                            }`}
                         >
                           {u.isActive ? "Aktif" : "Nonaktif"}
                         </button>
@@ -1196,3 +1182,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
