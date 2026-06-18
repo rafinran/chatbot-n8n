@@ -31,5 +31,5 @@ export interface ChatResponseDto {
 
 export const SendMessageSchema = z.object({
   message: z.string().min(1, "Pesan tidak boleh kosong").max(5000, "Pesan maksimal 5000 karakter"),
-  conversationId: z.number().int().positive().optional(),
+  conversationId: z.coerce.number().int().positive().optional(),
 });
